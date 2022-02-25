@@ -23,10 +23,26 @@
    - Store the credentials (username and password) in "teamsautomation".
    This is not a recommended situation and will be fixed as soon as a technical solution is known. 
 
+  .INPUTS
+  RunbookCustomization: {
+        "Parameters": {
+            "UserName": {
+                "Hide": true
+            },
+            "CallerName": {
+                "Hide": true
+            },
+            "TeamsCredentials": {
+                "Hide": true
+            }
+        }
+    }
+
+
 #>
 
-
 #Requires -Modules @{ModuleName = "RealmJoin.RunbookHelper"; ModuleVersion = "0.6.0" }, @{ModuleName = "MicrosoftTeams"; ModuleVersion = "3.1.0" }
+
 param(
     [Parameter(Mandatory = $true)]
     [ValidateScript( { Use-RJInterface -Type Graph -Entity User -DisplayName "User" } )]
@@ -37,15 +53,12 @@ param(
     [ValidateScript( { Use-RJInterface -DisplayName "Phone number to assign (E.164 Format - Example:+49123987654" } )]
     [String] $PhoneNumber,
 
-    [parameter(Mandatory = $false)]
     [ValidateScript( { Use-RJInterface -DisplayName "Microsoft Teams OnlineVoiceRoutingPolicy Name" } )]
     [String] $OnlineVoiceRoutingPolicy,
 
-    [parameter(Mandatory = $false)]
     [ValidateScript( { Use-RJInterface -DisplayName "Microsoft Teams DialPlan Name" } )]
     [String] $TenantDialPlan,
 
-    [parameter(Mandatory = $false)]
     [ValidateScript( { Use-RJInterface -DisplayName "Microsoft Teams CallingPolicy Name" } )]
     [String] $TeamsCallingPolicy,
 
@@ -63,7 +76,7 @@ param(
 $TimeStamp = ([datetime]::now).tostring("yyyy-MM-dd HH:mm:ss")
 Write-Output "$TimeStamp - Connection - Connect to Microsoft Teams (PowerShell)"
 
-$CredAutomation = Get-AutomationPSCredential -Name 'teamsautomation'
+$CredAutomation = Get-AutomationPSCredential -Name $TeamsCredentials
 Connect-MicrosoftTeams -Credential $CredAutomation
 
 # Check if Teams connection is active

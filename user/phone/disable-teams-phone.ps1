@@ -23,8 +23,25 @@
    - Store the credentials (username and password) in "teamsautomation".
    This is not a recommended situation and will be fixed as soon as a technical solution is known. 
 
+  .INPUTS
+  RunbookCustomization: {
+        "Parameters": {
+            "UserName": {
+                "Hide": true
+            },
+            "CallerName": {
+                "Hide": true
+            },
+            "TeamsCredentials": {
+                "Hide": true
+            }
+        }
+    }
+
 #>
+
 #Requires -Modules @{ModuleName = "RealmJoin.RunbookHelper"; ModuleVersion = "0.6.0" }, @{ModuleName = "MicrosoftTeams"; ModuleVersion = "3.1.0" }
+
 param(
     [Parameter(Mandatory = $true)]
     # User which should be cleared
@@ -33,7 +50,9 @@ param(
 
     # CallerName is tracked purely for auditing purposes
     [Parameter(Mandatory = $true)]
-    [string] $CallerName
+    [string] $CallerName,
+
+    [string]$TeamsCredentials = "teamsautomation"
 )
 
 ########################################################
@@ -46,7 +65,7 @@ $TimeStamp = ([datetime]::now).tostring("yyyy-MM-dd HH:mm:ss")
 Write-Output "$TimeStamp - Connection - Connect to Microsoft Teams (PowerShell)"
 
 #Needs to be replaced to an RealmJoin Setting!!!
-$CredAutomation = Get-AutomationPSCredential -Name 'teamsautomation'
+$CredAutomation = Get-AutomationPSCredential -Name $TeamsCredentials
 Connect-MicrosoftTeams -Credential $CredAutomation
 
 # Check if Teams connection is active
