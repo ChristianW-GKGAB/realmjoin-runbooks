@@ -23,7 +23,7 @@
     }
 #>
 
-#Requires -Modules @{ModuleName = "RealmJoin.RunbookHelper"; ModuleVersion = "0.6.0" },Microsoft.Graph
+#Requires -Modules @{ModuleName = "RealmJoin.RunbookHelper"; ModuleVersion = "0.6.0" }
 
 param(
     [Parameter(Mandatory = $true)]
@@ -33,12 +33,13 @@ param(
     [Parameter(Mandatory = $true)]
     [string] $CallerName
 )
-
+f
 Connect-RjRbGraph
 $devicelist
-$GroupMembers = Get-MgGroupMember -ObjectId $GroupID -All
+
+$GroupMembers = Invoke-RjRbRestMethodGraph -Resource "/Groups/$($GroupID)/Members"
 foreach ($GroupMember in $GroupMembers){
-    $UserDevices = Get-MgUserRegisteredDevice -ObjectId $GroupMember -All
+    $UserDevices = Invoke-RjRbRestMethodGraph -Resource "/User/$($GroupMember)/registeredDevices"
     foreach ($UserDevice in $UserDevices){
         $devicelist =+ $UserDevice
     }
