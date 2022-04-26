@@ -33,7 +33,6 @@ param(
     [Parameter(Mandatory = $true)]
     [string] $CallerName
 )
-f
 Connect-RjRbGraph
 $devicelist
 
