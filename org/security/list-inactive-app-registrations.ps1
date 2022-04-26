@@ -26,7 +26,7 @@
 
 param(
     [ValidateScript( { Use-RJInterface -DisplayName "Days without user logon" } )]
-    [int] $Days = 2,
+    [int] $Days = 90,
     # CallerName is tracked purely for auditing purposes
     [Parameter(Mandatory = $true)]
     [string] $CallerName
@@ -43,15 +43,11 @@ $lastSignInDate = (get-date) - (New-TimeSpan -Days $days) | Get-Date -Format "yy
 Invoke-RjRbRestMethodGraph -Resource "/auditLogs/SignIns" | Select-Object -Property appDisplayName,appId,createdDateTime | Group-Object -Property Id | ForEach-Object {
     $first = $_.Group | Sort-Object -Property createdDateTime | Select-Object -First 1
     if($first.createdDateTime -le $lastSignInDate){
-        $first.appId
          try {
             $app = Invoke-RjRbRestMethodGraph -Resource "/servicePrincipals" -OdFilter "appId eq '$($first.appId)'"
-            write-output $app
-            
             Invoke-RjRbRestMethodGraph -Resource "/servicePrincipals/$($app.Id)" -Method Patch -body @{ notes = $(($first.createdDateTime).ToString('o')) }
         }
          catch {
-             Write-Output "fail"
              $_
          
        }
