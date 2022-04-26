@@ -43,6 +43,8 @@ param(
     [string] $CallerName
 )
 
+Connect-RjRbGraph
+
 $dir1 = "$dir\CABackup"
 New-Item -Path $dir1 -ItemType Directory -Force -ErrorAction SilentlyContinue
 $BackupPath = "$dir1\$date"
@@ -52,7 +54,7 @@ If (!(Test-Path $BackupPath))
 }
 $Currentdate = (Get-Date).AddDays(-1)
 $Modifiedpolicies = "$BackupPath\ChangestoCAPolicies.txt"
-$AllPolicies = Get-AzureADMSConditionalAccessPolicy
+$AllPolicies = Invoke-RjRbRestMethodGraph -Resource "/policies/conditionalAccessPolicies"
 foreach ($Policy in $AllPolicies)
 {
 	Write-host "Backing up $($Policy.DisplayName)"
