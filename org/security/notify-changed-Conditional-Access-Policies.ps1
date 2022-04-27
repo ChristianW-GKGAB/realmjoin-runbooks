@@ -38,6 +38,8 @@ param(
     [string] $StorageAccountLocation,
     [ValidateScript( { Use-RJInterface -Type Setting -Attribute "CaPoliciesExport.StorageAccount.Sku" } )]
     [string] $StorageAccountSku,
+    [ValidateScript( { Use-RJInterface -Type Setting -Attribute "SenderMail" } )]
+    [string] $From,
     # CallerName is tracked purely for auditing purposes
     [Parameter(Mandatory = $true)]
     [string] $CallerName
