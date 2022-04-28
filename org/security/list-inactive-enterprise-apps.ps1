@@ -26,7 +26,7 @@
 
 param(
     [ValidateScript( { Use-RJInterface -DisplayName "Days without user logon" } )]
-    [int] $Days = 90,
+    [int] $Days = 2,
     # CallerName is tracked purely for auditing purposes
     [Parameter(Mandatory = $true)]
     [string] $CallerName
@@ -40,16 +40,36 @@ $lastSignInDate = (get-date) - (New-TimeSpan -Days $days) | Get-Date -Format "yy
 
 "## Inactive Applications (No SignIn since at least $Days days):"
 ""
-Invoke-RjRbRestMethodGraph -Resource "/auditLogs/SignIns" | Select-Object -Property appDisplayName,appId,createdDateTime | Group-Object -Property Id | ForEach-Object {
+[array]$UsedApps = @()
+Invoke-RjRbRestMethodGraph -Resource "/auditLogs/SignIns" | Select-Object -Property appDisplayName,appId,createdDateTime | Group-Object -Property appId | ForEach-Object {
     $first = $_.Group | Sort-Object -Property createdDateTime | Select-Object -First 1
+        $UsedApps += Invoke-RjRbRestMethodGraph -Resource "/servicePrincipals" -OdFilter "appId eq '$($first.appId)'"
+    
+
+    
     if($first.createdDateTime -le $lastSignInDate){
          try {
             $app = Invoke-RjRbRestMethodGraph -Resource "/servicePrincipals" -OdFilter "appId eq '$($first.appId)'"
             Invoke-RjRbRestMethodGraph -Resource "/servicePrincipals/$($app.Id)" -Method Patch -body @{ notes = $(($first.createdDateTime).ToString('o')) }
+            $loginTime = New-TimeSpan -Start $first.createdDateTime -End (Get-Date) 
+            "## $($app.appDisplayName) no logins for $($loginTime.Days) Days"
+
         }
          catch {
              $_
          
        }
     }
+}
+
+try {
+
+    $AllApps = Invoke-RjRbRestMethodGraph -Resource "/servicePrincipals"
+    $unusedApps = (Compare-Object $AllApps $UsedApps).InputObject
+    foreach($unusedApp in $unusedApps){
+        "## $($unusedApp.appDisplayName): no Login found"
+    }
+}
+catch {
+    $_
 }
