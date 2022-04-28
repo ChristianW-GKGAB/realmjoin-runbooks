@@ -26,7 +26,7 @@
 
 param(
     [ValidateScript( { Use-RJInterface -DisplayName "Days without user logon" } )]
-    [int] $Days = 2,
+    [int] $Days = 90,
     # CallerName is tracked purely for auditing purposes
     [Parameter(Mandatory = $true)]
     [string] $CallerName
