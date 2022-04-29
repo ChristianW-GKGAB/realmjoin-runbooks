@@ -25,60 +25,52 @@
 
 #>
 
-#Requires -Modules @{ModuleName = "RealmJoin.RunbookHelper"; ModuleVersion = "0.6.0" }, Az.Storage
+#Requires -Modules @{ModuleName = "RealmJoin.RunbookHelper"; ModuleVersion = "0.6.0" }
 
 param(
-    [ValidateScript( { Use-RJInterface -Type Setting -Attribute "CaPoliciesExport.Container" } )]
-    [string] $ContainerName,
-    [ValidateScript( { Use-RJInterface -Type Setting -Attribute "CaPoliciesExport.ResourceGroup" } )]
-    [string] $ResourceGroupName,
-    [ValidateScript( { Use-RJInterface -Type Setting -Attribute "CaPoliciesExport.StorageAccount.Name" } )]
-    [string] $StorageAccountName,
-    [ValidateScript( { Use-RJInterface -Type Setting -Attribute "CaPoliciesExport.StorageAccount.Location" } )]
-    [string] $StorageAccountLocation,
-    [ValidateScript( { Use-RJInterface -Type Setting -Attribute "CaPoliciesExport.StorageAccount.Sku" } )]
-    [string] $StorageAccountSku,
+
     [ValidateScript( { Use-RJInterface -Type Setting -Attribute "SenderMail" } )]
     [string] $From,
+    [ValidateScript( { Use-RJInterface -Type Setting -Attribute "SenderMail" } )]
+    [string] $To,
     # CallerName is tracked purely for auditing purposes
     [Parameter(Mandatory = $true)]
     [string] $CallerName
 )
 
 Connect-RjRbGraph
+<#$Body = "Hi Team,
+Please find the list of Conditional Access Policies that are created or modified in the last 24 hours.
 
-$dir1 = "$dir\CABackup"
-New-Item -Path $dir1 -ItemType Directory -Force -ErrorAction SilentlyContinue
-$BackupPath = "$dir1\$date"
-If (!(Test-Path $BackupPath))
-{
-	New-Item -Path $BackupPath -ItemType Directory -Force
-}
+Thanks,
+O365 Automation
+Note: This is an auto generated email, please do not reply to this.
+"#>
+[array] $Modifiedpolicies = @()
 $Currentdate = (Get-Date).AddDays(-1)
-$Modifiedpolicies = "$BackupPath\ChangestoCAPolicies.txt"
 $AllPolicies = Invoke-RjRbRestMethodGraph -Resource "/policies/conditionalAccessPolicies"
 foreach ($Policy in $AllPolicies)
 {
-	Write-host "Backing up $($Policy.DisplayName)"
-	$Policy | ConvertTo-Json | Out-File "$BackupPath\$($Policy.Id).json"
-	$policyModifieddate = nullable[datetime]
-	$policyCreationdate = nullable[datetime]
+	$policyModifieddate =  $Policy.modifiedDateTime
+	$policyCreationdate = $Policy.createdDateTime 
 	if (($policyModifieddate -gt $Currentdate) -or ($policyCreationdate -gt $Currentdate))
 	{
-		#write-host "------There are policies updated in the last 24 hours, please refer txt file." -ForegroundColor Green
+		write-host "------There are policies updated in the last 24 hours, please refer txt file." -ForegroundColor Green
 		IF (($policyModifieddate))
 		{
-			"PolicyID:$($policy.ID) & Name:$($policy.DisplayName) & Modified date:$policyModifieddate" | Out-File $Modifiedpolicies -Append
+			$Modifiedpolicies += "PolicyID:$($policy.ID) & Name:$($policy.DisplayName) & Modified date:$policyModifieddate" 
 		}
 		else
 		{
-			"PolicyID:$($policy.ID) & Name:$($policy.DisplayName) & Creation date:$policyCreationdate" | Out-File $Modifiedpolicies -Append
+			$Modifiedpolicies += "PolicyID:$($policy.ID) & Name:$($policy.DisplayName) & Creation date:$policyCreationdate" 
 		}
 	}
 }
+
 #send email if any changes to the Conditional Access Policies in the last 24 hours
-If ($Null -ne (Get-Content $Modifiedpolicies))
+If ($Null -ne ($Modifiedpolicies))
 {
 	write-host "Found policies" -ForegroundColor Yellow
-	Send-MailMessage -From $From -To $To -SmtpServer $smtp -Subject $Subject -Body $Body -Attachments "$Modifiedpolicies"
+    Write-Output $Modifiedpolicies
+	#Send-MailMessage -From $From -To $To -Subject $Subject -Body $Body -Attachments (File-out "$Modifiedpolicies")
 }
