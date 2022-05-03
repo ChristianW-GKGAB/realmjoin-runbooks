@@ -29,9 +29,11 @@
 #Requires -Modules @{ModuleName = "RealmJoin.RunbookHelper"; ModuleVersion = "0.6.0" }
 
 param(
-    [ValidateScript( { Use-RJInterface -Type Setting -Attribute "SenderMail" } )]
+    [Parameter(Mandatory = $true)]
+    [ValidateScript( { Use-RJInterface -DisplayName "SenderMail" } )]
     [string] $From,
-    [ValidateScript( { Use-RJInterface -Type Setting -Attribute "RecipientMail" } )]
+    [Parameter(Mandatory = $true)]
+    [ValidateScript( { Use-RJInterface -DisplayName "RecipientMail" } )]
     [string] $To,
     # CallerName is tracked purely for auditing purposes
     [Parameter(Mandatory = $true)]
@@ -42,12 +44,12 @@ Connect-RjRbGraph
 
 $Subject = "Created or modified Conditional Access Policies on " + (get-date -Format yyyy-MM-dd)
 $Body = "Hi Team,
-         in the attachment of this Mail you find the list of Conditional Access Policies that are created or modified in the last 24 hours
-           
-         Thanks,
-         O365 Automation
-         Note: This is an auto generated email, please do not reply to this.
-         "
+in the attachment of this Mail you find the list of Conditional Access Policies that are created or modified in the last 24 hours
+  
+Thanks,
+O365 Automation
+Note: This is an auto generated email, please do not reply to this.
+"
 $AttachmentName = "conditional-policy-changes-" + (get-date -Format "yyyy-MM-dd")
 [string] $Modifiedpolicies = @()
 $Currentdate = (Get-Date).AddDays(-1)
@@ -72,33 +74,35 @@ foreach ($Policy in $AllPolicies)
     	}
     }
 
-if ($Modifiedpolicies.Count -ne 0 ){
+if ($Modifiedpolicies.Length -ne 0 ){
     $Modifiedpoliciesbytes = [System.Text.Encoding]::UTF8.GetBytes( $Modifiedpolicies)
     $ModifiedpoliciesEncoded = [System.Convert]::ToBase64String($Modifiedpoliciesbytes)
+    
     $SenderUser = Invoke-RjRbRestMethodGraph -Resource "/users/$From"
-    $Mailbody = @{
-        message= @{
-            subject =  $Subject;
-            body = @{
-                contentType= "Text";
-                content = $Body
-            };
-            toRecipients = @{
-                    emailAddress = @{
-                        address = $To
-                    }
-                };
-            attachments = @{
-                    '@odata.type' = "#microsoft.graph.fileAttachment";
-                    name = $AttachmentName + ".txt";
-                    contentType = "text/plain";
-                    contentBytes = $ModifiedpoliciesEncoded
-                }
-            
-        }
+    $Mailbody = @{}
+    $innerbody =@{contentType= "Text";content = $Body}      
+    $emailAddress = @{"address"=$To.ToString()}
+    $Mailaddress = @{"emailAddress"=$emailAddress}
+    $Recipientlist = New-Object System.Collections.ArrayList
+    $Recipientlist.Add($Mailaddress)
+                
+    $attachment = New-Object System.Collections.ArrayList
+    $attachment.Add(@{"@odata.type"="#microsoft.graph.fileAttachment";"name"=$AttachmentName + ".txt";"contentType" = "text/plain";"contentBytes" = $ModifiedpoliciesEncoded}) 
+    $message = @{"subject"=$Subject;"body" =$innerbody;"toRecipients" = $Recipientlist;"attachments"=$attachment}     
+    $Mailbody =@{"message"=$message} 
+    
+    $MailbodyJson = ConvertTo-Json -InputObject $Mailbody -Depth 10
+    Write-Output $MailbodyJson
+    try{
+    Invoke-RjRbRestMethodGraph -Resource "/users/$($SenderUser.id)/microsoft.graph.SendMail" -Body $MailbodyJson
     }
-    Invoke-RjRbRestMethodGraph -Resource "/users/$($SenderUser.id)/microsoft.graph.SendMail" -Body $Mailbody
+    catch{
+        $_
+    }
     
 
+}
+else{
+    Write-Out "nothing changed"
 }
 
