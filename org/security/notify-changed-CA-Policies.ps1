@@ -82,9 +82,8 @@ if ($Modifiedpolicies.Length -ne 0 ){
     $Mailbody = @{}
     $innerbody =@{contentType= "Text";content = $Body}      
     $emailAddress = @{"address"=$To.ToString()}
-    $Mailaddress = @{"emailAddress"=$emailAddress}
     $Recipientlist = New-Object System.Collections.ArrayList
-    $Recipientlist.Add($Mailaddress)
+    $Recipientlist.Add(@{"emailAddress"=$emailAddress})
                 
     $attachment = New-Object System.Collections.ArrayList
     $attachment.Add(@{"@odata.type"="#microsoft.graph.fileAttachment";"name"=$AttachmentName + ".txt";"contentType" = "text/plain";"contentBytes" = $ModifiedpoliciesEncoded}) 
