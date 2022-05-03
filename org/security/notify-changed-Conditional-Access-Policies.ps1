@@ -25,52 +25,174 @@
 
 #>
 
-#Requires -Modules @{ModuleName = "RealmJoin.RunbookHelper"; ModuleVersion = "0.6.0" }
+#Requires -Modules @{ModuleName = "RealmJoin.RunbookHelper"; ModuleVersion = "0.6.0" }, Az.Storage
 
 param(
-
+    [ValidateScript( { Use-RJInterface -Type Setting -Attribute "CaPoliciesExport.Container" } )]
+    [string] $ContainerName,
+    [ValidateScript( { Use-RJInterface -Type Setting -Attribute "CaPoliciesExport.ResourceGroup" } )]
+    [string] $ResourceGroupName,
+    [ValidateScript( { Use-RJInterface -Type Setting -Attribute "CaPoliciesExport.StorageAccount.Name" } )]
+    [string] $StorageAccountName,
+    [ValidateScript( { Use-RJInterface -Type Setting -Attribute "CaPoliciesExport.StorageAccount.Location" } )]
+    [string] $StorageAccountLocation,
+    [ValidateScript( { Use-RJInterface -Type Setting -Attribute "CaPoliciesExport.StorageAccount.Sku" } )]
+    [string] $StorageAccountSku,
     [ValidateScript( { Use-RJInterface -Type Setting -Attribute "SenderMail" } )]
     [string] $From,
-    [ValidateScript( { Use-RJInterface -Type Setting -Attribute "SenderMail" } )]
+    [ValidateScript( { Use-RJInterface -Type Setting -Attribute "RecipientMail" } )]
     [string] $To,
     # CallerName is tracked purely for auditing purposes
     [Parameter(Mandatory = $true)]
     [string] $CallerName
-)
 
-Connect-RjRbGraph
-<#$Body = "Hi Team,
-Please find the list of Conditional Access Policies that are created or modified in the last 24 hours.
+    )
 
-Thanks,
-O365 Automation
-Note: This is an auto generated email, please do not reply to this.
-"#>
-[array] $Modifiedpolicies = @()
-$Currentdate = (Get-Date).AddDays(-1)
-$AllPolicies = Invoke-RjRbRestMethodGraph -Resource "/policies/conditionalAccessPolicies"
-foreach ($Policy in $AllPolicies)
-{
-	$policyModifieddate =  $Policy.modifiedDateTime
-	$policyCreationdate = $Policy.createdDateTime 
-	if (($policyModifieddate -gt $Currentdate) -or ($policyCreationdate -gt $Currentdate))
-	{
-		write-host "------There are policies updated in the last 24 hours, please refer txt file." -ForegroundColor Green
-		IF (($policyModifieddate))
-		{
-			$Modifiedpolicies += "PolicyID:$($policy.ID) & Name:$($policy.DisplayName) & Modified date:$policyModifieddate" 
-		}
-		else
-		{
-			$Modifiedpolicies += "PolicyID:$($policy.ID) & Name:$($policy.DisplayName) & Creation date:$policyCreationdate" 
-		}
-	}
+    function Export-PolicyObjects {
+        param (
+            [Parameter(Mandatory = $true)]
+            [array]$policies
+        )
+    
+        $policies | ForEach-Object {
+            $name = $_.displayName -replace "[$([RegEx]::Escape([string][IO.Path]::GetInvalidFileNameChars()))]+", "_"
+            if (-not (Test-Path ($name + ".json"))) {
+                $_ | ConvertTo-Json -Depth 6 > ($name + ".json")
+            }
+            else {
+                "## Will not overwrite " + ($name + ".json") + ". Skipping."
+            }
+         
+        }
+    
+    }
+
+if (-not $ContainerName) {
+    $ContainerName = "conditional-policy-changes-" + (get-date -Format "yyyy-MM-dd")
 }
+try{
+    # Configuration import - fallback to Az Automation Variable 
+    if ((-not $ResourceGroupName) -or (-not $StorageAccountName) -or (-not $StorageAccountLocation) -or (-not $StorageAccountSku)) {
+        $processConfigRaw = Get-AutomationVariable -name "SettingsExports" -ErrorAction SilentlyContinue
+        #if (-not $processConfigRaw) {
+        ## production default
+        #    $processConfigURL = "https://raw.githubusercontent.com/realmjoin/realmjoin-runbooks/production/setup/defaults/settings-org-policies-export.json"
+        #    $webResult = Invoke-WebRequest -UseBasicParsing -Uri $processConfigURL 
+        #    $processConfigRaw = $webResult.Content        ## staging default
+        #}
+        # Write-RjRbDebug "Process Config URL is $($processConfigURL)"
 
-#send email if any changes to the Conditional Access Policies in the last 24 hours
-If ($Null -ne ($Modifiedpolicies))
-{
-	write-host "Found policies" -ForegroundColor Yellow
-    Write-Output $Modifiedpolicies
-	#Send-MailMessage -From $From -To $To -Subject $Subject -Body $Body -Attachments (File-out "$Modifiedpolicies")
+        # "Getting Process configuration"
+        $processConfig = $processConfigRaw | ConvertFrom-Json
+
+        if (-not $ResourceGroupName) {
+            $ResourceGroupName = $processConfig.exportResourceGroupName
+        }
+
+        if (-not $StorageAccountName) {
+            $StorageAccountName = $processConfig.exportStorAccountName
+        }
+
+        if (-not $StorageAccountLocation) {
+            $StorageAccountLocation = $processConfig.exportStorAccountLocation
+        }
+
+        if (-not $StorageAccountSku) {
+            $StorageAccountSku = $processConfig.exportStorAccountSKU
+        }
+        #endregion
+    }
+    if ((-not $ResourceGroupName) -or (-not $StorageAccountName) -or (-not $StorageAccountSku) -or (-not $StorageAccountLocation)) {
+        "## To backup cond. access policies to a storage account, please use RJ Runbooks Customization ( https://portal.realmjoin.com/settings/runbooks-customizations ) to specify an Azure Storage Account for upload."
+        "## Alternatively, present values for ResourceGroup and StorageAccount when staring the runbook."
+        ""
+        "## Configure the following attributes:"
+        "## - CaPoliciesExport.ResourceGroup"
+        "## - CaPoliciesExport.StorageAccount.Name"
+        "## - CaPoliciesExport.StorageAccount.Location"
+        "## - CaPoliciesExport.StorageAccount.Sku"
+        ""
+        "## Stopping execution."
+        throw "Missing Storage Account Configuration."
+    }
+
+
+    Connect-RjRbGraph
+    Connect-RjRbAzAccount
+
+    
+    $Subject = "Created or modified Conditional Access Policies on " + (get-date -Format yyyy-MM-dd)
+    [array] $Modifiedpolicies = @()
+    $Currentdate = (Get-Date).AddDays(-1)
+    $AllPolicies = Invoke-RjRbRestMethodGraph -Resource "/policies/conditionalAccessPolicies"
+    foreach ($Policy in $AllPolicies)
+    {
+    	$policyModifieddate =  $Policy.modifiedDateTime
+    	$policyCreationdate = $Policy.createdDateTime 
+    	if (($policyModifieddate -gt $Currentdate) -or ($policyCreationdate -gt $Currentdate))
+    	{
+    		write-host "------There are policies updated in the last 24 hours, please refer txt file." -ForegroundColor Green
+    		IF (($policyModifieddate))
+    		{
+    			$Modifiedpolicies += $policy
+    		}
+    		else
+    		{
+    			$Modifiedpolicies += $policy 
+    		}
+    	}
+    }
+    if ($Modifiedpolicies.Count -ne 0 ){
+        mkdir "CAPols" | Out-Null
+        Set-Location -Path "CAPols" | Out-Null
+        Export-PolicyObjects -policies $Modifiedpolicies
+        Set-Location -Path ".."  | Out-Null
+        Compress-Archive -Path "CAPols\*" -DestinationPath "$ContainerName.zip" | Out-Null
+        # Make sure storage account exists
+        $storAccount = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageAccountName -ErrorAction SilentlyContinue
+        if (-not $storAccount) {
+            "## Creating Azure Storage Account $($StorageAccountName)"
+            $storAccount = New-AzStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageAccountName -Location $StorageAccountLocation -SkuName $StorageAccountSku 
+        }
+
+        # Get access to the Storage Account
+        $keys = Get-AzStorageAccountKey -ResourceGroupName $ResourceGroupName -Name $StorageAccountName
+        $context = New-AzStorageContext -StorageAccountName $StorageAccountName -StorageAccountKey $keys[0].Value
+
+        # Make sure, container exists
+        $container = Get-AzStorageContainer -Name $ContainerName -Context $context -ErrorAction SilentlyContinue
+        if (-not $container) {
+            "## Creating Azure Storage Account Container $($ContainerName)"
+            $container = New-AzStorageContainer -Name $ContainerName -Context $context
+            "" 
+        }
+        
+        Set-AzStorageBlobContent -File "$ContainerName.zip" -Container $ContainerName -Blob "$ContainerName.zip" -Context $context -Force | Out-Null
+
+        #send email if any changes to the Conditional Access Policies in the last 24 hours
+        write-host "Found policies" -ForegroundColor Yellow
+        Write-Output $Modifiedpolicies
+        #Create signed (SAS) link
+
+
+        $EndTime = (Get-Date).AddDays(6)
+        $SASLink = New-AzStorageBlobSASToken -Permission "r" -Container $ContainerName -Context $context -Blob "$ContainerName.zip" -FullUri -ExpiryTime $EndTime
+        $Body = "Hi Team,
+         in the following Link you find the list of Conditional Access Policies that are created or modified in the last 24 hours:
+         "+ $SASLink + "   
+         Thanks,
+         O365 Automation
+         Note: This is an auto generated email, please do not reply to this.
+         "
+        Write-Output $Body
+        Write-Output $Subject
+        #Send-MailMessage -From $From -To $To -Subject $Subject -Body $Body -SmtpServer
+        
+    }   
+}
+catch{
+    throw $_
+}
+finally {
+    Disconnect-AzAccount -Confirm:$false | Out-Null
 }
