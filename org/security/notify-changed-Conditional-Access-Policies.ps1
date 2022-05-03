@@ -123,6 +123,7 @@ try{
     
     $Subject = "Created or modified Conditional Access Policies on " + (get-date -Format yyyy-MM-dd)
     [array] $Modifiedpolicies = @()
+    [string] $ModifiedpoliciesString = @()
     $Currentdate = (Get-Date).AddDays(-1)
     $AllPolicies = Invoke-RjRbRestMethodGraph -Resource "/policies/conditionalAccessPolicies"
     foreach ($Policy in $AllPolicies)
@@ -134,15 +135,17 @@ try{
     		write-host "------There are policies updated in the last 24 hours, please refer txt file." -ForegroundColor Green
     		IF (($policyModifieddate))
     		{
-    			$Modifiedpolicies += $policy
+    			#$Modifiedpolicies += $policy
+                $ModifiedpoliciesString += "PolicyID:$($policy.ID) & Name:$($policy.DisplayName) & Modified date:$policyModifieddate"
     		}
     		else
     		{
-    			$Modifiedpolicies += $policy 
+    			#$Modifiedpolicies += $policy 
+                $ModifiedpoliciesString += "PolicyID:$($policy.ID) & Name:$($policy.DisplayName) & Creation date:$policyCreationdate" 
     		}
     	}
     }
-    if ($Modifiedpolicies.Count -ne 0 ){
+    if ($ModifiedpoliciesString.Count -ne 0 ){
         mkdir "CAPols" | Out-Null
         Set-Location -Path "CAPols" | Out-Null
         Export-PolicyObjects -policies $Modifiedpolicies
@@ -168,7 +171,7 @@ try{
         }
         
         Set-AzStorageBlobContent -File "$ContainerName.zip" -Container $ContainerName -Blob "$ContainerName.zip" -Context $context -Force | Out-Null
-
+        
         #send email if any changes to the Conditional Access Policies in the last 24 hours
         write-host "Found policies" -ForegroundColor Yellow
         Write-Output $Modifiedpolicies
@@ -177,6 +180,7 @@ try{
 
         $EndTime = (Get-Date).AddDays(6)
         $SASLink = New-AzStorageBlobSASToken -Permission "r" -Container $ContainerName -Context $context -Blob "$ContainerName.zip" -FullUri -ExpiryTime $EndTime
+        
         $Body = "Hi Team,
          in the following Link you find the list of Conditional Access Policies that are created or modified in the last 24 hours:
          "+ $SASLink + "   
@@ -184,9 +188,36 @@ try{
          O365 Automation
          Note: This is an auto generated email, please do not reply to this.
          "
+        
+        $Modifiedpoliciesbytes = [System.Text.Encoding]::UTF8.GetBytes( $ModifiedpoliciesString)
+        $ModifiedpoliciesEncoded = [System.Convert]::ToBase64String($Modifiedpoliciesbytes)
+
+        $SenderMail = Invoke-RjRbRestMethodGraph -Resource "/users/$From"
+        $Mailbody = @{
+            message= @{
+                subject =  "Meet for lunch?";
+                body = @{
+                    contentType= "Text";
+                    content = $Body
+                };
+                toRecipients = @{
+                        emailAddress = @{
+                            address = $To
+                        }
+                    };
+                attachments = @{
+                        '@odata.type' = "#microsoft.graph.fileAttachment";
+                        name = ".txt";
+                        contentType = "text/plain";
+                        contentBytes = $ModifiedpoliciesEncoded
+                    }
+                
+            }
+        }
         Write-Output $Body
         Write-Output $Subject
-        #Send-MailMessage -From $From -To $To -Subject $Subject -Body $Body -SmtpServer
+        Invoke-RjRbRestMethodGraph -Resource "/users/$($SenderMail.id)/microsoft.graph.SendMail" -Body $Mailbody
+        
         
     }   
 }
