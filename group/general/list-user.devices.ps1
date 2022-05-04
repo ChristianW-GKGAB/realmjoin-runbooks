@@ -13,9 +13,6 @@
   .INPUTS
   RunbookCustomization: {
         "Parameters": {
-            "GroupId": {
-                "Hide": true
-            },
             "CallerName": { 
                 "Hide": true
             }
@@ -34,17 +31,30 @@ param(
     [string] $CallerName
 )
 Connect-RjRbGraph
-$devicelist
-
+[array] $devicelist = @{}
+try{
 $GroupMembers = Invoke-RjRbRestMethodGraph -Resource "/Groups/$($GroupID)/Members"
-foreach ($GroupMember in $GroupMembers){
-    $UserDevices = Invoke-RjRbRestMethodGraph -Resource "/User/$($GroupMember)/registeredDevices"
-    foreach ($UserDevice in $UserDevices){
-        $devicelist =+ $UserDevice
+    foreach ($GroupMember in $GroupMembers){
+
+        try {  
+            $UserDevices = Invoke-RjRbRestMethodGraph -Resource "/users/$($GroupMember.id)/registeredDevices"
+            if($UserDevices){
+                foreach ($UserDevice in $UserDevices){
+                    $devicelist += $UserDevice
+                }
+            }
+        }
+        catch {
+           $_
+        }
+       
     }
 }
+catch{
+    $_
+}
 if ($devicelist) {
-    $devicelist | Format-Table -AutoSize -Property "deviceid","userPrincipalName" | Out-String
+    $devicelist | Format-Table -AutoSize -Property "deviceid", "DisplayName" | Out-String
 } else {
     "## No devices found (or no access)."
 }
