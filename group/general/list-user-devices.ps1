@@ -62,16 +62,13 @@ if ($devicelist.Count -gt 0) {
         $deviceIds.Add($device.Id)
     }
     $deviceIds
-    $bindings = New-Object System.Collections.ArrayList($null)
+    $bindings = @()
     foreach($deviceId in $deviceIds){
         $bindings += "https://graph.microsoft.com/v1.0/directoryObjects/" + $deviceId.ToString()
     }
     $deviceGroupbody = @{"members@odata.bind" = $bindings}
-    $deviceGroupJson = ConvertTo-Json -InputObject $deviceGroupbody -Depth 10 
-    #add users to targetgroup
-    Write-Output $deviceGroupJson
     try {
-        Invoke-RjRbRestMethodGraph -Resource "/groups/$targetgroup" -Method "Patch" -Body $deviceGroupJson
+        Invoke-RjRbRestMethodGraph -Resource "/groups/$targetgroup" -Method "Patch" -Body $deviceGroupbody
     }
     catch {
         $_
