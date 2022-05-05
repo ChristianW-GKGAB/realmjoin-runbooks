@@ -12,11 +12,47 @@
 
   .INPUTS
   RunbookCustomization: {
-        "Parameters": {
-            "CallerName": { 
+        "ParameterList": [
+            {
+                "DisplayName": "Action",
+                "DisplayBefore": "targetgroup",
+                "Select": {
+                    "Options": [
+                        {
+                            "Display": "put devices owned by group members in specified AAD Group",
+                            "Customization": {
+                                "Default": {
+                                    "moveGroup": true
+                                }
+                            }
+                        }, {
+                            "Display": "list devices owned by group members",
+                            "Customization": {
+                                "Default": {
+                                    "moveGroup": false
+                                },
+                                "Hide": [
+                                    "targetgroup"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                "Default": "put devices owned by group members in specified AAD Group"
+            },
+            {
+                "Name": "CallerName",
                 "Hide": true
-            }
-        }
+            },
+            {
+                "Name": "moveGroup",
+                "Hide": true
+            },
+            {
+                "Name": "GroupID",
+                "Hide": true
+            },
+        ]
     }
 #>
 
@@ -26,7 +62,8 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidateScript( { Use-RJInterface -Type Graph -Entity Group -DisplayName "Usergroup" } )]
     [String] $GroupID,
-    [Parameter(Mandatory = $true)]
+    [ValidateScript( { Use-RJInterface -DisplayName "List Devices owned by Group Members" } )]
+    [bool]$moveGroup = $false,
     [ValidateScript( { Use-RJInterface -Type Graph -Entity Group -DisplayName "Devicegroup" } )]
     [String] $targetgroup,
     # CallerName is tracked purely for auditing purposes
@@ -57,22 +94,25 @@ catch{
 
 if ($devicelist.Count -gt 0) {
     $devicelist | Format-Table -AutoSize -Property "deviceid", "DisplayName" | Out-String
-    $deviceIds = New-Object System.Collections.ArrayList($null)
-    foreach($device in $devicelist){
-        $deviceIds.Add($device.Id)
+    if($moveGroup){
+        $deviceIds = New-Object System.Collections.ArrayList($null)
+        foreach($device in $devicelist){
+            [void]$deviceIds.Add($device.Id)
+        }
+        $bindings = @()
+        foreach($deviceId in $deviceIds){
+            $bindings += "https://graph.microsoft.com/v1.0/directoryObjects/" + $deviceId.ToString()
+        }
+        $deviceGroupbody = @{"members@odata.bind" = $bindings}
+        try {
+            Invoke-RjRbRestMethodGraph -Resource "/groups/$targetgroup" -Method "Patch" -Body $deviceGroupbody
+            "## moved devices to group with ID: $targetgroup"
+        }
+        catch {
+            $_
+        }
     }
-    $deviceIds
-    $bindings = @()
-    foreach($deviceId in $deviceIds){
-        $bindings += "https://graph.microsoft.com/v1.0/directoryObjects/" + $deviceId.ToString()
-    }
-    $deviceGroupbody = @{"members@odata.bind" = $bindings}
-    try {
-        Invoke-RjRbRestMethodGraph -Resource "/groups/$targetgroup" -Method "Patch" -Body $deviceGroupbody
-    }
-    catch {
-        $_
-    }
+
     
     
 } else {
