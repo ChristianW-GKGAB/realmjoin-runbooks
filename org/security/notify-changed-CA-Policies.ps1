@@ -102,6 +102,6 @@ if ($Modifiedpolicies.Length -ne 0 ){
 
 }
 else{
-    Write-Out "nothing changed"
+    "nothing changed"
 }
 
