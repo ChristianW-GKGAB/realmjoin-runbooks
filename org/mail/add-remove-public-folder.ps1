@@ -1,9 +1,9 @@
 <#
   .SYNOPSIS
-  Turn this users mailbox into a shared mailbox.
+  Add or remove public folder.
 
   .DESCRIPTION
-  Turn this users mailbox into a shared mailbox.
+  Add or remove public folder.
 
   .NOTES
   Permissions given to the Az Automation RunAs Account:
@@ -14,37 +14,33 @@
 
   .INPUTS
   RunbookCustomization: {
-            "AddPublicFolder": {
-                "Hide": true
-            }
-        },
         "ParameterList": [
             {
                 "DisplayName": "Action",
-                "DisplayBefore": "AutoMapping",
+                "DisplayBefore": "MailboxName",
                 "Select": {
                     "Options": [
                         {
-                            "Display": "Turn mailbox into shared mailbox",
+                            "Display": "Add a Public Folder",
                             "Customization": {
                                 "Default": {
                                     "AddPublicFolder": true
                                 }
                             }
                         }, {
-                            "Display": "turn shared mailbox back into regular mailbox",
+                            "Display": "Remove a Public folder",
                             "Customization": {
                                 "Default": {
                                     "AddPublicFolder": false
                                 },
                                 "Hide": [
-                                    "MailboxName""
+                                    "MailboxName"
                                 ]
                             }
                         }
                     ]
                 },
-                "Default": "Turn mailbox into shared mailbox"
+                "Default": "Add a Public Folder"
             },
             {
                 "Name": "CallerName",
@@ -60,12 +56,13 @@
 param
 (
     [Parameter(Mandatory = $true)] 
-    [ValidateScript( { Use-RJInterface DisplayName "Name of Public Folder" } )]
+    [ValidateScript( { Use-RJInterface -DisplayName "Name of Public Folder" } )]
     [string] $PublicFolderName,
-    [ValidateScript( { Use-RJInterface -Type Graph -Entity User -DisplayName "User/Mailbox"} )]
+    [ValidateScript( { Use-RJInterface -DisplayName "PublicFolder/Mailbox"} )]
     [string] $MailboxName,
-    [ValidateScript( { Use-RJInterface -DisplayName "Turn mailbox back to regular mailbox" } )]
-    [bool] $AddPublicFolder = $true,
+    [Parameter(Mandatory = $true)] 
+    [ValidateScript( { Use-RJInterface -DisplayName "Add a Public Folder" } )]
+    [bool] $AddPublicFolder,
     # CallerName is tracked purely for auditing purposes
     [Parameter(Mandatory = $true)]
     [string] $CallerName
@@ -73,7 +70,7 @@ param
 )
 
 try {
-    "## Trying to connect and check for $UserName"
+    "## Trying to connect and check for $PublicFolderName"
     Connect-RjRbExchangeOnline
     "## connected"
     #set-PublicFolder für einstellungen verwalten
