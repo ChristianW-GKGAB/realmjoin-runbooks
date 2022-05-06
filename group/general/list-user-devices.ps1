@@ -72,38 +72,38 @@ param(
 )
 Connect-RjRbGraph
 $devicelist = New-Object System.Collections.ArrayList
-try{
-$GroupMembers = Invoke-RjRbRestMethodGraph -Resource "/Groups/$($GroupID)/Members"
-    foreach ($GroupMember in $GroupMembers){
+try {
+    $GroupMembers = Invoke-RjRbRestMethodGraph -Resource "/Groups/$($GroupID)/Members"
+    foreach ($GroupMember in $GroupMembers) {
 
         try {  
             $UserDevices = Invoke-RjRbRestMethodGraph -Resource "/users/$($GroupMember.id)/registeredDevices"
-            if($UserDevices){
+            if ($UserDevices) {
                 $devicelist += $UserDevices
             }
         }
         catch {
-           $_
+            $_
         }
        
     }
 }
-catch{
+catch {
     $_
 }
 
 if ($devicelist.Count -gt 0) {
     $devicelist | Format-Table -AutoSize -Property "deviceid", "DisplayName" | Out-String
-    if($moveGroup){
+    if ($moveGroup) {
         $deviceIds = New-Object System.Collections.ArrayList($null)
-        foreach($device in $devicelist){
+        foreach ($device in $devicelist) {
             [void]$deviceIds.Add($device.Id)
         }
         $bindings = @()
-        foreach($deviceId in $deviceIds){
+        foreach ($deviceId in $deviceIds) {
             $bindings += "https://graph.microsoft.com/v1.0/directoryObjects/" + $deviceId.ToString()
         }
-        $deviceGroupbody = @{"members@odata.bind" = $bindings}
+        $deviceGroupbody = @{"members@odata.bind" = $bindings }
         try {
             Invoke-RjRbRestMethodGraph -Resource "/groups/$targetgroup" -Method "Patch" -Body $deviceGroupbody
             "## moved devices to group with ID: $targetgroup"
@@ -112,9 +112,8 @@ if ($devicelist.Count -gt 0) {
             $_
         }
     }
-
     
-    
-} else {
+}
+else {
     "## No devices found (or no access)."
 }
