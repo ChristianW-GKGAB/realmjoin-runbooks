@@ -1,5 +1,7 @@
 import-module ActiveDirectory
 
+
+#define ADGroupSamAccountNames and MigGroupName variables beforehand
 #$ADGroupSamAccountNames = @()
 [string] $MigGroupName
 
