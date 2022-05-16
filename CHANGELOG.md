@@ -1,5 +1,27 @@
 # RealmJoin Runbooks Changelog 
 
+## 2022-05-12
+* Add User: Supports adding users to Exchange Distr. Lists / mail enabled groups
+
+## 2022-05-11
+* Offboard user permanently / temporarily: Added support for removing Exchange groups / distr. lists
+* Multiple Runbooks: Use displaynames instead of UIDs in output were possible for better readability
+
+## 2022-05-06
+
+* List expiring app credentials: Can limit output to creds about to expire.
+* New Runbook: Report changes to Cond. Access Policies via eMail
+  * intended for scheduled execution (daily)
+  * needs Send eMail permissions 
+* New Runbook: List devices of members (users) in a group
+  * Can optionally collect the devices into an AAD group
+
+## 2022-05-05
+
+* New Runbooks using MDE / Defenter ATP
+  * Isolate Device
+  * Restrict Code Execution
+
 ## 2022-04-28
 
 * New Runbook: Convert user mailbox to shared mailbox
