@@ -25,16 +25,12 @@
 param (
     [ValidateScript( { Use-RJInterface -Type Setting -Attribute "Devices.Container" } )]
     [string] $ContainerName,
-    [Parameter(Mandatory = $true)]
     [ValidateScript( { Use-RJInterface -Type Setting -Attribute "Devices.ResourceGroup" } )]
     [string] $ResourceGroupName,
-    [Parameter(Mandatory = $true)]
     [ValidateScript( { Use-RJInterface -Type Setting -Attribute "Devices.StorageAccount.Name" } )]
     [string] $StorageAccountName,
-    [Parameter(Mandatory = $true)]
     [ValidateScript( { Use-RJInterface -Type Setting -Attribute "Devices.StorageAccount.Location" } )]
     [string] $StorageAccountLocation,
-    [Parameter(Mandatory = $true)]
     [ValidateScript( { Use-RJInterface -Type Setting -Attribute "Devices.StorageAccount.Sku" } )]
     [string] $StorageAccountSku,
     [Parameter(Mandatory = $true)]
@@ -49,21 +45,26 @@ Connect-RjRbGraph
 Connect-RjRbAzAccount
 try {
     # "Getting Process configuration"
+    if ((-not $ResourceGroupName) -or (-not $StorageAccountName) -or (-not $StorageAccountLocation) -or (-not $StorageAccountSku)) {
+        $processConfigRaw = Get-AutomationVariable -name "SettingsExports" -ErrorAction SilentlyContinue
 
-    if (-not $ResourceGroupName) {
-        $ResourceGroupName = $processConfig.exportResourceGroupName
-    }
+        $processConfig = $processConfigRaw | ConvertFrom-Json
 
-    if (-not $StorageAccountName) {
-        $StorageAccountName = $processConfig.exportStorAccountName
-    }
+        if (-not $ResourceGroupName) {
+            $ResourceGroupName = $processConfig.exportResourceGroupName
+        }
 
-    if (-not $StorageAccountLocation) {
-        $StorageAccountLocation = $processConfig.exportStorAccountLocation
-    }
+        if (-not $StorageAccountName) {
+            $StorageAccountName = $processConfig.exportStorAccountName
+        }
 
-    if (-not $StorageAccountSku) {
-        $StorageAccountSku = $processConfig.exportStorAccountSKU
+        if (-not $StorageAccountLocation) {
+            $StorageAccountLocation = $processConfig.exportStorAccountLocation
+        }
+
+        if (-not $StorageAccountSku) {
+            $StorageAccountSku = $processConfig.exportStorAccountSKU
+        }
     }
 
     if ((-not $ResourceGroupName) -or (-not $StorageAccountName) -or (-not $StorageAccountSku) -or (-not $StorageAccountLocation)) {
@@ -132,4 +133,7 @@ try {
 }
 catch {
     $_
+}
+finally {
+    Disconnect-AzAccount -ErrorAction SilentlyContinue -Confirm:$false | Out-Null
 }
