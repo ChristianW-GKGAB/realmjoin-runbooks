@@ -9,6 +9,7 @@
   Permissions
    MS Graph (API): 
    - DeviceManagementManagedDevices.Read.All
+   - Groups.ReadWrite.All
 
   .INPUTS
   RunbookCustomization: {
