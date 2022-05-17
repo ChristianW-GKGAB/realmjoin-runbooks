@@ -1,9 +1,9 @@
 <#
   .SYNOPSIS
-  List all devices and where they are registered.
+  Add new users and those in a Migration group to a set of groups.
 
   .DESCRIPTION
-  List all devices and where they are registered.
+  Add new users and those in a Migration group to a set of groups.
 
   .NOTES
   Permissions
@@ -25,38 +25,52 @@
 
 
 param(
+    [ValidateScript( { Use-RJInterface -DisplayName "MigGroupId" } )]
+    [string] $MigGroupId,
+    [ValidateScript( { Use-RJInterface -DisplayName "Array of Ids of targetgroups separate by ," } )]
+    [string] $TargetGroupIdString,
     [Parameter(Mandatory = $true)]
     [string] $CallerName 
 )
 Connect-RjRbGraph
 
-#define TargetgroupIds and MigGroupId variables beforehand
-[string] $MigGroupId = ""
+
+$MigGroupId
 $TargetGroupIds = @()
+$TargetGroupIds = $TargetGroupIdString.Split(',')
+$TargetGroupIds
+#define TargetgroupIds and MigGroupId variables beforehand
+#[string] $MigGroupId = ""
+#$TargetGroupIds = @()
 $beforedate = (Get-Date).AddDays(-1) | Get-Date -Format "yyyy-MM-dd"
-
-$AADGroups = @()
-foreach ($TargetGroupId in $TargetgroupIds) {
-    $AADGroups += Invoke-RjRbRestMethodGraph -Resource "/groups/$TargetGroupId" 
-}
-
-$filter = 'createdDateTime ge ' + $beforedate + 'T00:00:00Z'
-$NewUsers = Invoke-RjRbRestMethodGraph -Resource "/users" -OdFilter $filter
-
-$MigGroupMembers = Invoke-RjRbRestMethodGraph -Resource "/groups/$MigGroupId/members"
-$MigrationUsers = @()
-$MigrationUsers += $MigGroupMembers
-$MigrationUsers += $NewUsers
-
-foreach ($AADGroup in $AADGroups) {
-    $AADGroupMembers = @()
-    $AADGroupMembers += Invoke-RjRbRestMethodGraph -Resource "/groups/$($AADGroup.Id)/members" -OdSelect "Id"
-    [array] $bindings = @()
-    foreach ($MigrationUser in $MigrationUsers) {
-        if (!($AADgroupMembers.contains($MigrationUser.id))) {
-            $bindings += "https://graph.microsoft.com/v1.0/directoryObjects/$($MigrationUser.id)"
-        }
+try {
+    $AADGroups = @()
+    foreach ($TargetGroupId in $TargetgroupIds) {
+        $AADGroups += Invoke-RjRbRestMethodGraph -Resource "/groups/$TargetGroupId" 
     }
-    $GroupJson = @{"members@odata.bind" = $bindings }
-    Invoke-RjRbRestMethodGraph -Resource "/groups/$($AADGroup.Id)" -Method Patch -Body $GroupJson 
+
+    $filter = 'createdDateTime ge ' + $beforedate + 'T00:00:00Z'
+    $NewUsers = Invoke-RjRbRestMethodGraph -Resource "/users" -OdFilter $filter
+
+    $MigGroupMembers = Invoke-RjRbRestMethodGraph -Resource "/groups/$MigGroupId/members"
+    $MigrationUsers = @()
+    $MigrationUsers += $MigGroupMembers
+    $MigrationUsers += $NewUsers
+
+    foreach ($AADGroup in $AADGroups) {
+        $AADGroupMembers = @()
+        $AADGroupMembers += Invoke-RjRbRestMethodGraph -Resource "/groups/$($AADGroup.Id)/members" -OdSelect "Id"
+        [array] $bindings = @()
+        foreach ($MigrationUser in $MigrationUsers) {
+            if (!($AADgroupMembers.contains($MigrationUser.id))) {
+                $bindings += "https://graph.microsoft.com/v1.0/directoryObjects/$($MigrationUser.id)"
+            }
+        }
+        $GroupJson = @{"members@odata.bind" = $bindings }
+        Invoke-RjRbRestMethodGraph -Resource "/groups/$($AADGroup.Id)" -Method Patch -Body $GroupJson
+        "## added Users to group $($AADGroup.displayName)" 
+    }
+}
+catch {
+    $_
 }
