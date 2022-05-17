@@ -40,7 +40,7 @@ param (
 )
 
 if (-not $ContainerName) {
-    $ContainerName = "Stale-device-list-" + (get-date -Format "yyyy-MM-dd")
+    $ContainerName = "stale-device-list-" + (get-date -Format "yyyy-MM-dd")
 }
 $beforedate = (Get-Date).AddDays(-$Days) | Get-Date -Format "yyyy-MM-dd"
 
@@ -123,13 +123,13 @@ try {
     }
 
 
-    $Exportdevices | ConvertTo-Csv > device.csv
+    $Exportdevices | ConvertTo-Csv > stale-devices.csv
 
     # Upload
-    Set-AzStorageBlobContent -File "device.csv" -Container $ContainerName -Blob "device.csv" -Context $context -Force | Out-Null
+    Set-AzStorageBlobContent -File "stale-devices.csv" -Container $ContainerName -Blob "stale-devices.csv" -Context $context -Force | Out-Null
 
     $EndTime = (Get-Date).AddDays(6)
-    $SASLink = New-AzStorageBlobSASToken -Permission "r" -Container $ContainerName -Context $context -Blob "device.csv" -FullUri -ExpiryTime $EndTime
+    $SASLink = New-AzStorageBlobSASToken -Permission "r" -Container $ContainerName -Context $context -Blob "stale-devices.csv" -FullUri -ExpiryTime $EndTime
 
     "## App Owner/User List Export created."
     "## Expiry of Link: $EndTime"
