@@ -16,9 +16,6 @@
         "Parameters": {
             "CallerName": {
                 "Hide": true
-            },
-            "TargetGroupIdString": {
-                "Hide": true
             }
         }
     }
@@ -30,15 +27,17 @@
 param(
     [ValidateScript( { Use-RJInterface -Type Graph -Entity Group -DisplayName "Source Group" } )]
     [string] $MigGroupId,
-    [ValidateScript( { Use-RJInterface -DisplayName "Array of Ids of targetgroups separate by ','" } )]
+    [ValidateScript( { Use-RJInterface -DisplayName "Ids of targetgroups separated by , " } )]
     [string] $TargetGroupIdString,
-    [ValidateScript( { Use-RJInterface -DisplayName "Array of targetgroup Names separate by ','" } )]
+    [ValidateScript( { Use-RJInterface -DisplayName "Names of targetgroups separated by , " } )]
     [string] $TargetGroupNameString,
+    # CallerName is tracked purely for auditing purposes
     [Parameter(Mandatory = $true)]
     [string] $CallerName 
 )
 Connect-RjRbGraph
 
+$TargetGroupIdString
 
 $MigGroupId
 if ($TargetGroupIdString) {
@@ -47,6 +46,7 @@ if ($TargetGroupIdString) {
     $TargetGroupIds
 }
 else {
+    $TargetGroupNameString
     $TargetGroupNames = @()
     $TargetGroupNames = $TargetGroupNameString.Split(',')
     $TargetGroupNames
@@ -78,16 +78,23 @@ try {
 
     foreach ($AADGroup in $AADGroups) {
         $AADGroupMembers = @()
-        $AADGroupMembers += Invoke-RjRbRestMethodGraph -Resource "/groups/$($AADGroup.Id)/members" -OdSelect "Id"
+        $AADGroupMembers += (Invoke-RjRbRestMethodGraph -Resource "/groups/$($AADGroup.Id)/members" -OdSelect "Id").id
         [array] $bindings = @()
         foreach ($MigrationUser in $MigrationUsers) {
-            if (!($AADgroupMembers.contains($MigrationUser.id))) {
-                $bindings += "https://graph.microsoft.com/v1.0/directoryObjects/$($MigrationUser.id)"
+            $bindingString = "https://graph.microsoft.com/v1.0/directoryObjects/$($MigrationUser.id)"
+            if (!($AADgroupMembers.contains($MigrationUser.id)) -and !($bindings.Contains($bindingString))) {
+
+                $bindings += $bindingString
             }
         }
-        $GroupJson = @{"members@odata.bind" = $bindings }
-        Invoke-RjRbRestMethodGraph -Resource "/groups/$($AADGroup.Id)" -Method Patch -Body $GroupJson
-        "## added Users to group $($AADGroup.displayName)" 
+        if ($bindings) {
+            $GroupJson = @{"members@odata.bind" = $bindings }
+            Invoke-RjRbRestMethodGraph -Resource "/groups/$($AADGroup.Id)" -Method Patch -Body $GroupJson 
+            "## added Users to group $($AADGroup.displayName)" 
+        }
+        else {
+            "## all users already in Group $($AADGroup.displayName)"
+        }
     }
 }
 catch {
