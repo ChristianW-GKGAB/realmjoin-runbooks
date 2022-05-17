@@ -14,8 +14,8 @@
   .INPUTS
   RunbookCustomization: {
         "Parameters": {
-            "TargetGroupIdString":{
-                "Hide": true
+            "TargetGroupIdString": {
+                 "Hide": true
             },
             "CallerName": {
                 "Hide": true
