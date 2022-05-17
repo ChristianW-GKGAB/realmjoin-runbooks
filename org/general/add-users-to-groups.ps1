@@ -16,6 +16,9 @@
         "Parameters": {
             "CallerName": {
                 "Hide": true
+            },
+            "TargetGroupIdString": {
+                "Hide": true
             }
         }
     }
@@ -25,10 +28,12 @@
 
 
 param(
-    [ValidateScript( { Use-RJInterface -DisplayName "MigGroupId" } )]
+    [ValidateScript( { Use-RJInterface -Type Graph -Entity Group -DisplayName "Source Group" } )]
     [string] $MigGroupId,
-    [ValidateScript( { Use-RJInterface -DisplayName "Array of Ids of targetgroups separate by ," } )]
+    [ValidateScript( { Use-RJInterface -DisplayName "Array of Ids of targetgroups separate by ','" } )]
     [string] $TargetGroupIdString,
+    [ValidateScript( { Use-RJInterface -DisplayName "Array of targetgroup Names separate by ','" } )]
+    [string] $TargetGroupNameString,
     [Parameter(Mandatory = $true)]
     [string] $CallerName 
 )
@@ -36,17 +41,31 @@ Connect-RjRbGraph
 
 
 $MigGroupId
-$TargetGroupIds = @()
-$TargetGroupIds = $TargetGroupIdString.Split(',')
-$TargetGroupIds
+if ($TargetGroupIdString) {
+    $TargetGroupIds = @()
+    $TargetGroupIds = $TargetGroupIdString.Split(',')
+    $TargetGroupIds
+}
+else {
+    $TargetGroupNames = @()
+    $TargetGroupNames = $TargetGroupNameString.Split(',')
+    $TargetGroupNames
+}
 #define TargetgroupIds and MigGroupId variables beforehand
 #[string] $MigGroupId = ""
 #$TargetGroupIds = @()
 $beforedate = (Get-Date).AddDays(-1) | Get-Date -Format "yyyy-MM-dd"
 try {
     $AADGroups = @()
-    foreach ($TargetGroupId in $TargetgroupIds) {
-        $AADGroups += Invoke-RjRbRestMethodGraph -Resource "/groups/$TargetGroupId" 
+    if ($TargetGroupIds) {
+        foreach ($TargetGroupId in $TargetgroupIds) {
+            $AADGroups += Invoke-RjRbRestMethodGraph -Resource "/groups/$TargetGroupId" 
+        }
+    }
+    else {
+        foreach ($TargetGroupName in $TargetGroupNames) {
+            $AADGroups += Invoke-RjRbRestMethodGraph -Resource "/groups" -OdFilter "displayName eq '$TargetGroupName'"
+        }
     }
 
     $filter = 'createdDateTime ge ' + $beforedate + 'T00:00:00Z'
