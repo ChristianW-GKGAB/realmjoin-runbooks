@@ -9,45 +9,36 @@
   Permissions
    MS Graph (API): 
    - DeviceManagementManagedDevices.Read.All
+   - Directory.Read.All
+   - Device.Read.All
 
   .INPUTS
   RunbookCustomization: {
-      "Parameters": { 
-          "Sync": {
-              "DisplayName": "Last Login or Last Intune Sync"
-              "Select":{
-                  Options:[
-                      {
-                          "Display": "Show by Last Intune Sync",
-                          "ParameterValue": true,
-                          "Customization": {
-                                "Hide": [
-                                    "CallerName",
-                                    "Sync"
-                                ]
-                            }
-                      },
-                      {
-                          "Display": "Show by Last Login",
-                          "ParameterValue": false,
-                          "Customization": {
-                                "Hide": [
-                                    "CallerName",
-                                    "Sync"
-                                ]
-                            }
-                      },
-                  ],
-                  "ShowValue": false
-              }
-          },
-          "CallerName": {
-                "Hide": true
-          }
+    "Parameters": { 
+        "Sync": {
+            "DisplayName": "Last Login or Last Intune Sync",
+            "Select":{
+                "Options":[
+                    {
+                        "Display": "Show by Last Intune Sync",
+                        "ParameterValue": true
+                    },
+                    {
+                        "Display": "Show by Last Login",
+                        "ParameterValue": false
+                    }
+                ],
+                "ShowValue": false
+            }
+        },
+        "CallerName": {
+              "Hide": true
         }
-    }
+      }
+  }
 
 #>
+
 #Requires -Modules @{ModuleName = "RealmJoin.RunbookHelper"; ModuleVersion = "0.6.0" }
 
 param (
