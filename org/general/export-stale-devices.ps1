@@ -12,19 +12,50 @@
 
   .INPUTS
   RunbookCustomization: {
-        "Parameters": {
-            "CallerName": {
+        "ParameterList": [
+            {
+                "DisplayName": "Action",
+                "DisplayBefore": "Days",
+                "Select": {
+                    "Options": [
+                        {
+                            "Display": "Show by Last Intune Sync",
+                            "Customization": {
+                                "Default": {
+                                    "Sync": true
+                                }
+                            }
+                        }, {
+                            "Display": "Show by Last Login",
+                            "Customization": {
+                                "Default": {
+                                    "Sync": false
+                                }
+                            }
+                        }
+                    ]
+                },
+                "Default": "Show by Last Intune Sync"
+            },
+            {
+                "Name": "CallerName",
+                "Hide": true
+            },
+            {
+                "Name": "Sync",
                 "Hide": true
             }
-        }
+        ]
     }
 
 #>
 #Requires -Modules @{ModuleName = "RealmJoin.RunbookHelper"; ModuleVersion = "0.6.0" }
 
 param (
-    [ValidateScript( { Use-RJInterface -DisplayName "Number of days without login before a Device is considered Stale" } )]
+    [ValidateScript( { Use-RJInterface -DisplayName "Number of days without Contact before a Device is considered Stale" } )]
     [int] $Days,
+    [ValidateScript( { Use-RJInterface -DisplayName "Decider  Last Sync or Last login" } )]
+    [bool] $Sync,
     [ValidateScript( { Use-RJInterface -Type Setting -Attribute "Devices.Container" } )]
     [string] $ContainerName,
     [ValidateScript( { Use-RJInterface -Type Setting -Attribute "Devices.ResourceGroup" } )]
@@ -39,8 +70,10 @@ param (
     [string] $CallerName
 )
 
-if (-not $ContainerName) {
-    $ContainerName = "stale-device-list-" + (get-date -Format "yyyy-MM-dd")
+if ((-not $ContainerName) -and $Sync) {
+    $ContainerName = "stale-sync-device-list-" + (get-date -Format "yyyy-MM-dd")
+}elseif (-not $ContainerName) {
+    $ContainerName = "stale-login-device-list-" + (get-date -Format "yyyy-MM-dd")
 }
 $beforedate = (Get-Date).AddDays(-$Days) | Get-Date -Format "yyyy-MM-dd"
 
@@ -86,15 +119,30 @@ try {
 
     $Exportdevices = @()
     $Devices = [psobject]
+    if($Sync){
     $SelectString = "deviceName, lastSyncDateTime, enrolledDateTime, userPrincipalName, id, serialNumber, manufacturer, model, imei, managedDeviceOwnerType, operatingSystem, osVersion, complianceState"
     $filter = 'lastSyncDateTime le ' + $beforedate + 'T00:00:00Z'
     $Devices = Invoke-RjRbRestMethodGraph -Resource "/deviceManagement/managedDevices" -OdSelect $SelectString -OdFilter $filter
-
+} else {
+    $filter='approximateLastSignInDateTime le ' + $beforedate + 'T00:00:00Z'
+    $SelectString = "displayName,deviceId,approximateLastSignInDateTime,createdDateTime,id,manufacturer,deviceOwnership,operatingSystem,operatingSystemVersion"
+    "## Inactive Devices (No SignIn since at least $Days days):"
+    ""
+    
+    $Devices = Invoke-RjRbRestMethodGraph -Resource "/devices" -OdFilter $filter -OdSelect $SelectString | Sort-Object -Property approximateLastSignInDateTime
+}
     foreach ($Device in $Devices) {
+        if($Sync){
         $primaryOwner = Invoke-RjRbRestMethodGraph -Resource "/Users/$($Device.userPrincipalName)" -OdSelect "city, country, department, usageLocation"
+        }else{
+            $primaryOwner =Invoke-RjRbRestMethodGraph -Resource "/devices/$($Device.id)/registeredOwners" -OdSelect "userPrincipalName,city,department,usageLocation"
+        }
         $Exportdevice = @()
         $Exportdevice += $Device
         if ($primaryOwner) {
+            if(!$Sync){
+                $Exportdevice | Add-Member -Name "userPrincipalName" -Value $primaryOwner.userPrincipalName -MemberType "NoteProperty"
+            }
             $Exportdevice | Add-Member -Name "city" -Value $primaryOwner.city -MemberType "NoteProperty"
             $Exportdevice | Add-Member -Name "country" -Value $primaryOwner.country -MemberType "NoteProperty"
             $Exportdevice | Add-Member -Name "department" -Value $primaryOwner.department -MemberType "NoteProperty"
@@ -102,6 +150,7 @@ try {
         }
         $Exportdevices += $Exportdevice
     }
+
     #zugang zu Az storage um csv zu speichern
     #oder per mail attachment schicken vgl notify-changed-Conditional-Access-Policies.ps1 und notify-changed-CA-policies.ps1
 
@@ -122,14 +171,19 @@ try {
         $container = New-AzStorageContainer -Name $ContainerName -Context $context 
     }
 
-
-    $Exportdevices | ConvertTo-Csv > stale-devices.csv
-
+    if($Sync){
+    $Exportdevices | ConvertTo-Csv > stale-sync-devices.csv
+    $FileName = "stale-sync-devices.csv"
+    }
+    else{
+        $Exportdevices | ConvertTo-Csv > stale-login-devices.csv
+        $FileName = "stale-login-devices.csv"
+    }
     # Upload
-    Set-AzStorageBlobContent -File "stale-devices.csv" -Container $ContainerName -Blob "stale-devices.csv" -Context $context -Force | Out-Null
+    Set-AzStorageBlobContent -File $FileName -Container $ContainerName -Blob $FileName -Context $context -Force | Out-Null
 
     $EndTime = (Get-Date).AddDays(6)
-    $SASLink = New-AzStorageBlobSASToken -Permission "r" -Container $ContainerName -Context $context -Blob "stale-devices.csv" -FullUri -ExpiryTime $EndTime
+    $SASLink = New-AzStorageBlobSASToken -Permission "r" -Container $ContainerName -Context $context -Blob $FileName -FullUri -ExpiryTime $EndTime
 
     "## App Owner/User List Export created."
     "## Expiry of Link: $EndTime"
