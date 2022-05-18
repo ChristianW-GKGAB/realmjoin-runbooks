@@ -1,5 +1,18 @@
 # RealmJoin Runbooks Changelog 
 
+## 2022-05-16
+* new runbook: Export all devices (to a storage account)
+
+## 2022-05-16
+* Many runbooks: Improve output 
+* device wipe and deveice outphase: Show owner/user UPN for the device
+## 2022-05-12
+* Add User: Supports adding users to Exchange Distr. Lists / mail enabled groups
+
+## 2022-05-11
+* Offboard user permanently / temporarily: Added support for removing Exchange groups / distr. lists
+* Multiple Runbooks: Use displaynames instead of UIDs in output were possible for better readability
+
 ## 2022-05-06
 
 * List expiring app credentials: Can limit output to creds about to expire.
