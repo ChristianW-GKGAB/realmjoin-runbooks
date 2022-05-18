@@ -1,9 +1,9 @@
 <#
   .SYNOPSIS
-  List all devices and where they are registered.
+  List devices which haven't Synced with Intune or had a login in a certain number of Days.
 
   .DESCRIPTION
-  List all devices and where they are registered.
+  List devices which haven't Synced with Intune or had a login in a certain number of Days.
 
   .NOTES
   Permissions
@@ -12,40 +12,39 @@
 
   .INPUTS
   RunbookCustomization: {
-        "ParameterList": [
-            {
-                "DisplayName": "Action",
-                "DisplayBefore": "Days",
-                "Select": {
-                    "Options": [
-                        {
-                            "Display": "Show by Last Intune Sync",
-                            "Customization": {
-                                "Default": {
-                                    "Sync": true
-                                }
+      "Parameters": { 
+          "Sync": {
+              "DisplayName": "Last Login or Last Intune Sync"
+              "Select":{
+                  Options:[
+                      {
+                          "Display": "Show by Last Intune Sync",
+                          "ParameterValue": true,
+                          "Customization": {
+                                "Hide": [
+                                    "CallerName",
+                                    "Sync"
+                                ]
                             }
-                        }, {
-                            "Display": "Show by Last Login",
-                            "Customization": {
-                                "Default": {
-                                    "Sync": false
-                                }
+                      },
+                      {
+                          "Display": "Show by Last Login",
+                          "ParameterValue": false,
+                          "Customization": {
+                                "Hide": [
+                                    "CallerName",
+                                    "Sync"
+                                ]
                             }
-                        }
-                    ]
-                },
-                "Default": "Show by Last Intune Sync"
-            },
-            {
-                "Name": "CallerName",
+                      },
+                  ],
+                  "ShowValue": false
+              }
+          },
+          "CallerName": {
                 "Hide": true
-            },
-            {
-                "Name": "Sync",
-                "Hide": true
-            }
-        ]
+          }
+        }
     }
 
 #>
@@ -54,8 +53,8 @@
 param (
     [ValidateScript( { Use-RJInterface -DisplayName "Number of days without Contact before a Device is considered Stale" } )]
     [int] $Days,
-    [ValidateScript( { Use-RJInterface -DisplayName "Decider  Last Sync or Last login" } )]
-    [bool] $Sync,
+    [ValidateScript( { Use-RJInterface -DisplayName "Last Login or Last Intune Sync" } )]
+    [bool] $Sync = $true,
     [ValidateScript( { Use-RJInterface -Type Setting -Attribute "Devices.Container" } )]
     [string] $ContainerName,
     [ValidateScript( { Use-RJInterface -Type Setting -Attribute "Devices.ResourceGroup" } )]
@@ -72,7 +71,8 @@ param (
 
 if ((-not $ContainerName) -and $Sync) {
     $ContainerName = "stale-sync-device-list-" + (get-date -Format "yyyy-MM-dd")
-}elseif (-not $ContainerName) {
+}
+elseif (-not $ContainerName) {
     $ContainerName = "stale-login-device-list-" + (get-date -Format "yyyy-MM-dd")
 }
 $beforedate = (Get-Date).AddDays(-$Days) | Get-Date -Format "yyyy-MM-dd"
@@ -119,28 +119,30 @@ try {
 
     $Exportdevices = @()
     $Devices = [psobject]
-    if($Sync){
-    $SelectString = "deviceName, lastSyncDateTime, enrolledDateTime, userPrincipalName, id, serialNumber, manufacturer, model, imei, managedDeviceOwnerType, operatingSystem, osVersion, complianceState"
-    $filter = 'lastSyncDateTime le ' + $beforedate + 'T00:00:00Z'
-    $Devices = Invoke-RjRbRestMethodGraph -Resource "/deviceManagement/managedDevices" -OdSelect $SelectString -OdFilter $filter
-} else {
-    $filter='approximateLastSignInDateTime le ' + $beforedate + 'T00:00:00Z'
-    $SelectString = "displayName,deviceId,approximateLastSignInDateTime,createdDateTime,id,manufacturer,deviceOwnership,operatingSystem,operatingSystemVersion"
-    "## Inactive Devices (No SignIn since at least $Days days):"
-    ""
+    if ($Sync) {
+        $SelectString = "deviceName, lastSyncDateTime, enrolledDateTime, userPrincipalName, id, serialNumber, manufacturer, model, imei, managedDeviceOwnerType, operatingSystem, osVersion, complianceState"
+        $filter = 'lastSyncDateTime le ' + $beforedate + 'T00:00:00Z'
+        $Devices = Invoke-RjRbRestMethodGraph -Resource "/deviceManagement/managedDevices" -OdSelect $SelectString -OdFilter $filter
+    }
+    else {
+        $filter = 'approximateLastSignInDateTime le ' + $beforedate + 'T00:00:00Z'
+        $SelectString = "displayName,deviceId,approximateLastSignInDateTime,createdDateTime,id,manufacturer,deviceOwnership,operatingSystem,operatingSystemVersion"
+        "## Inactive Devices (No SignIn since at least $Days days):"
+        ""
     
-    $Devices = Invoke-RjRbRestMethodGraph -Resource "/devices" -OdFilter $filter -OdSelect $SelectString | Sort-Object -Property approximateLastSignInDateTime
-}
+        $Devices = Invoke-RjRbRestMethodGraph -Resource "/devices" -OdFilter $filter -OdSelect $SelectString | Sort-Object -Property approximateLastSignInDateTime
+    }
     foreach ($Device in $Devices) {
-        if($Sync){
-        $primaryOwner = Invoke-RjRbRestMethodGraph -Resource "/Users/$($Device.userPrincipalName)" -OdSelect "city, country, department, usageLocation"
-        }else{
-            $primaryOwner =Invoke-RjRbRestMethodGraph -Resource "/devices/$($Device.id)/registeredOwners" -OdSelect "userPrincipalName,city,department,usageLocation"
+        if ($Sync) {
+            $primaryOwner = Invoke-RjRbRestMethodGraph -Resource "/Users/$($Device.userPrincipalName)" -OdSelect "city, country, department, usageLocation"
+        }
+        else {
+            $primaryOwner = Invoke-RjRbRestMethodGraph -Resource "/devices/$($Device.id)/registeredOwners" -OdSelect "userPrincipalName,city,department,usageLocation"
         }
         $Exportdevice = @()
         $Exportdevice += $Device
         if ($primaryOwner) {
-            if(!$Sync){
+            if (!$Sync) {
                 $Exportdevice | Add-Member -Name "userPrincipalName" -Value $primaryOwner.userPrincipalName -MemberType "NoteProperty"
             }
             $Exportdevice | Add-Member -Name "city" -Value $primaryOwner.city -MemberType "NoteProperty"
@@ -171,11 +173,11 @@ try {
         $container = New-AzStorageContainer -Name $ContainerName -Context $context 
     }
 
-    if($Sync){
-    $Exportdevices | ConvertTo-Csv > stale-sync-devices.csv
-    $FileName = "stale-sync-devices.csv"
+    if ($Sync) {
+        $Exportdevices | ConvertTo-Csv > stale-sync-devices.csv
+        $FileName = "stale-sync-devices.csv"
     }
-    else{
+    else {
         $Exportdevices | ConvertTo-Csv > stale-login-devices.csv
         $FileName = "stale-login-devices.csv"
     }
