@@ -38,4 +38,9 @@ Connect-RjRbGraph
 $expiringDate = (get-date).AddDays($Days) | Get-Date -Format "yyyy-MM-dd"
 $filter = "EndDateTime lt $expiringDate" + "T00:00:00Z"
 
-Invoke-RjRbRestMethodGraph -Resource "/roleManagement/directory/roleAssignmentScheduleInstances" -OdFilter $filter
+$roleassignments =  Invoke-RjRbRestMethodGraph -Resource "/roleManagement/directory/roleAssignmentScheduleInstances" -OdFilter $filter
+foreach ($roleassignment in $roleassignments) {
+  $roleName = (Invoke-RjRbRestMethodGraph -Resource "/roleManagement/directory/roleDefinitions/$($roleassignment.roleDefinitionId)").DisplayName
+  $roleassignment | Add-Member -Name "DisplayName" -Value $roleName -MemberType "NoteProperty"
+}
+$roleassignments
