@@ -23,8 +23,8 @@
 #Requires -Modules @{ModuleName = "RealmJoin.RunbookHelper"; ModuleVersion = "0.6.0" }
 
 param(
-  [ValidateScript( { Use-RJInterface -DisplayName "Days without signin" } )]
-  [int] $Days = 3000,
+  [ValidateScript( { Use-RJInterface -DisplayName "MAximum days before expiry" } )]
+  [int] $Days = 30,
   # CallerName is tracked purely for auditing purposes
   [Parameter(Mandatory = $true)]
   [string] $CallerName
