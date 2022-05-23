@@ -205,9 +205,8 @@ param (
     [string] $GroupToAdd,
     [ValidateScript( { Use-RJInterface -Type Setting -Attribute "OffboardUserPermanently.groupsToRemovePrefix" } )]
     [String] $GroupsToRemovePrefix,
-    [ValidateScript( { Use-RJInterface -Type Graph -Entity User -DisplayName "Replacement Owner" } )]
-    [String] $ReplacementOwner,
-
+    [ValidateScript( { Use-RJInterface -Type Setting -Attribute "OffboardUserPermanently.ReplacementOwnerName" } )]
+    [String] $ReplacementOwnerName,
     # CallerName is tracked purely for auditing purposes
     [Parameter(Mandatory = $true)]
     [string] $CallerName
@@ -234,6 +233,7 @@ Connect-RjRbExchangeOnline
 "## Trying to permanently offboard user '$UserName'"
 
 "## Finding the user object $UserName"
+"## $ReplacementOwner"
 $targetUser = Invoke-RjRbRestMethodGraph -Resource "/users/$UserName"
 
 if (-not $targetUser) {
@@ -293,15 +293,15 @@ if ($DeleteUser) {
         "## Skipping license/group modifications as User object will be deleted."
     }
     $OwnedGroups = Invoke-RjRbRestMethodGraph -Resource "/users/$($targetUser.id)/ownedObjects/microsoft.graph.group/"
-    if ($OwnedGroups) {
+    if ($null -ne $OwnedGroups) {
         $ReplacementOwner = Invoke-RjRbRestMethodGraph -Resource "/users/$ReplacementOwnerName"
         foreach ($OwnedGroup in $OwnedGroups) {
             $owners = Invoke-RjRbRestMethodGraph -Resource "/groups/$($OwnedGroup.id)/owners"
-            if ($owners) {
+            if (([array]$owners).Count -eq 1) {
                 $ReplacementBodyString = "https://graph.microsoft.com/v1.0/users/$($ReplacementOwner.id)"
                 $ReplacementBody = @{"@odata.id" = $ReplacementBodyString }
-                $replacementResource = "/groups/$($OwnedGroup.id)/owners/" + '$ref'
-                Invoke-RjRbRestMethodGraph -Resource $replacementResource -Body $ReplacementBody
+                Invoke-RjRbRestMethodGraph -Resource "/groups/$($OwnedGroup.id)/owners/`$ref" -Body $ReplacementBody
+                "## changed ownership of group $($OwnedGroup.displayName) to $($ReplacementOwner.displayName)"
             }
         }
     }
