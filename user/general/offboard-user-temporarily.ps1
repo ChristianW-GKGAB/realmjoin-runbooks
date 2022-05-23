@@ -140,7 +140,8 @@
 
   .INPUTS
   RunbookCustomization: {
-        "Parameters": {            "CallerName": {
+        "Parameters": {            
+            "CallerName": {
                 "Hide": true
             }
         }
@@ -158,6 +159,8 @@ param (
     [bool] $DisableUser = $true,
     [ValidateScript( { Use-RJInterface -Type Setting -Attribute "OffboardUserTemporarily.revokeAccess" } )]
     [bool] $RevokeAccess = $true,
+    [ValidateScript( { Use-RJInterface -Type Setting -Attribute "OffboardUserTemporarily.revokeGroupOwnership" } )]
+    [bool] $RevokeGroupOwnership = $true,
     [ValidateScript( { Use-RJInterface -Type Setting -Attribute "OffboardUserTemporarily.exportResourceGroupName" } )]
     [String] $exportResourceGroupName,
     [ValidateScript( { Use-RJInterface -Type Setting -Attribute "OffboardUserTemporarily.exportStorAccountName" } )]
@@ -177,7 +180,9 @@ param (
     [ValidateScript( { Use-RJInterface -Type Setting -Attribute "OffboardUserTemporarily.groupToAdd" -DisplayName "Group to add or keep" } )]
     [string] $GroupToAdd,
     [ValidateScript( { Use-RJInterface -Type Setting -Attribute "OffboardUserTemporarily.groupsToRemovePrefix" } )]
-    [String] $GroupsToRemovePrefix,
+    [String] $GroupsToRemovePrefix, 
+    [ValidateScript( { Use-RJInterface -Type Setting -Attribute "OffboardUserPermanently.ReplacementOwnerName" } )]
+    [String] $ReplacementOwnerName,
     # CallerName is tracked purely for auditing purposes
     [Parameter(Mandatory = $true)]
     [string] $CallerName
@@ -253,6 +258,23 @@ if ($exportGroupMemberships) {
     Set-AzStorageBlobContent -File "memberships.txt" -Container $exportStorContainerGroupmembershipExports -Blob $UserName -Context $context -Force | Out-Null
     Disconnect-AzAccount -Confirm:$false | Out-Null
 }
+if ($RevokeGroupOwnership) {
+    $OwnedGroups = Invoke-RjRbRestMethodGraph -Resource "/users/$($targetUser.id)/ownedObjects/microsoft.graph.group/"
+    if ($null -ne $OwnedGroups) {
+        $ReplacementOwner = Invoke-RjRbRestMethodGraph -Resource "/users/$ReplacementOwnerName"
+        foreach ($OwnedGroup in $OwnedGroups) {
+            $owners = Invoke-RjRbRestMethodGraph -Resource "/groups/$($OwnedGroup.id)/owners"
+            if (([array]$owners).Count -eq 1) {
+                $ReplacementBodyString = "https://graph.microsoft.com/v1.0/users/$($ReplacementOwner.id)"
+                $ReplacementBody = @{"@odata.id" = $ReplacementBodyString }
+                Invoke-RjRbRestMethodGraph -Resource "/groups/$($OwnedGroup.id)/owners/`$ref" -Body $ReplacementBody
+                "## changed ownership of group $($OwnedGroup.displayName) to $($ReplacementOwner.displayName)"
+            }
+            Invoke-RjRbRestMethodGraph -Resource "/groups/$($OwnedGroup.id)/owners/$($targetUser.id)/`$ref" -Method Delete
+            "## removed Ownership of Group $($OwnedGroup.displayName) from $($targetUser.userPrincipalName)"
+        }
+    }
+}
 
 if ($ChangeGroupsSelector -ne 0) {
     # Add new licensing group, if not already assigned
@@ -281,6 +303,7 @@ if ($ChangeGroupsSelector -ne 0) {
         $groupsToRemove = $memberships 
     }
 
+    
     # Remove group memberships
     $groupsToRemove | ForEach-Object {
         if ($GroupToAdd -ne $_.DisplayName) {
