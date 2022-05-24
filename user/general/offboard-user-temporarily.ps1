@@ -258,20 +258,31 @@ if ($exportGroupMemberships) {
     Set-AzStorageBlobContent -File "memberships.txt" -Container $exportStorContainerGroupmembershipExports -Blob $UserName -Context $context -Force | Out-Null
     Disconnect-AzAccount -Confirm:$false | Out-Null
 }
+
 if ($RevokeGroupOwnership) {
     $OwnedGroups = Invoke-RjRbRestMethodGraph -Resource "/users/$($targetUser.id)/ownedObjects/microsoft.graph.group/"
-    if ($null -ne $OwnedGroups) {
-        $ReplacementOwner = Invoke-RjRbRestMethodGraph -Resource "/users/$ReplacementOwnerName"
+    if ($OwnedGroups) {
         foreach ($OwnedGroup in $OwnedGroups) {
             $owners = Invoke-RjRbRestMethodGraph -Resource "/groups/$($OwnedGroup.id)/owners"
             if (([array]$owners).Count -eq 1) {
-                $ReplacementBodyString = "https://graph.microsoft.com/v1.0/users/$($ReplacementOwner.id)"
-                $ReplacementBody = @{"@odata.id" = $ReplacementBodyString }
-                Invoke-RjRbRestMethodGraph -Resource "/groups/$($OwnedGroup.id)/owners/`$ref" -Body $ReplacementBody
-                "## changed ownership of group $($OwnedGroup.displayName) to $($ReplacementOwner.displayName)"
+                $ReplacementOwner = Invoke-RjRbRestMethodGraph -Resource "/users/$ReplacementOwnerName" -ErrorAction SilentlyContinue
+                if ($ReplacementOwner) {
+                    $ReplacementBodyString = "https://graph.microsoft.com/v1.0/users/$($ReplacementOwner.id)"
+                    $ReplacementBody = @{"@odata.id" = $ReplacementBodyString }
+                    Invoke-RjRbRestMethodGraph -Resource "/groups/$($OwnedGroup.id)/owners/`$ref" -Body $ReplacementBody
+                    Invoke-RjRbRestMethodGraph -Resource "/groups/$($OwnedGroup.id)/owners/$($targetUser.id)/`$ref" -Method Delete
+                    "## Changed ownership of group '$($OwnedGroup.displayName)' to '$($ReplacementOwner.displayName)'"
+                }
+                else {
+                    "## Replacement Owner '$ReplacementOwnerName' not found. Skipping ownership change for group '$($OwnedGroup.displayName)'." 
+                    "## Please verify owners of group '$($OwnedGroup.displayName)' manually!"
+                }
             }
-            Invoke-RjRbRestMethodGraph -Resource "/groups/$($OwnedGroup.id)/owners/$($targetUser.id)/`$ref" -Method Delete
-            "## removed Ownership of Group $($OwnedGroup.displayName) from $($targetUser.userPrincipalName)"
+            else {
+                Invoke-RjRbRestMethodGraph -Resource "/groups/$($OwnedGroup.id)/owners/$($targetUser.id)/`$ref" -Method Delete
+                "## Revoked Ownership of group '$($OwnedGroup.displayName)'"
+            }
+            
         }
     }
 }
