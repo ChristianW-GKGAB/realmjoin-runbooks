@@ -98,8 +98,8 @@ try {
         }
         $Exportdevices += $Exportdevice
     }
-    #zugang zu Az storage um csv zu speichern
-    #oder per mail attachment schicken vgl notify-changed-Conditional-Access-Policies.ps1 und notify-changed-CA-policies.ps1
+    #Access to Az storage to save csv
+    #or send as E-mail attachment as in notify-changed-Conditional-Access-Policies.ps1 and notify-changed-CA-policies.ps1
 
     $storAccount = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageAccountName -ErrorAction SilentlyContinue
     if (-not $storAccount) {
