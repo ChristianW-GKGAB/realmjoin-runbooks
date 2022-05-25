@@ -1,9 +1,9 @@
 <#
   .SYNOPSIS
-  List all devices and where they are registered.
+  List all app registrations that suffer from the CVE-2021-42306 vulnerability.
 
   .DESCRIPTION
-  List all devices and where they are registered.
+  List all app registrations that suffer from the CVE-2021-42306 vulnerability.
 
   .NOTES
   Permissions
