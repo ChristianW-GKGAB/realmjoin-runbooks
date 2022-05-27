@@ -41,7 +41,7 @@ param(
 
 
 if (-not $ContainerName) {
-    $ContainerName = "list-vulnerableAppReg"
+    $ContainerName = "list-vulnerableappreg"
 }
 
 if ((-not $ResourceGroupName) -or (-not $StorageAccountName) -or (-not $StorageAccountSku) -or (-not $StorageAccountLocation)) {
@@ -59,17 +59,17 @@ if ((-not $ResourceGroupName) -or (-not $StorageAccountName) -or (-not $StorageA
 }
 
 Connect-RjRbGraph
+Connect-RjRbAzAccount
 
 $beforedate = "2021-12-06T00:00:00Z"
 
 try {
 
-    $appregs = Invoke-RjRbRestMethodGraph -Resource "/applications" -OdSelect "displayName,id,appId,createdDateTime,keyCredentials" -OdFilter "createdDateTime gt $beforedate"
+    $appregs = Invoke-RjRbRestMethodGraph -Resource "/applications" -OdSelect "displayName,id,appId,createdDateTime,keyCredentials" -OdFilter "createdDateTime ge $beforedate"
 
 
     $AffectedAppRegs = @()
     foreach ($appreg in $appregs) {
-        $appreg
         if ($appreg.displayName) {
             $DisplayName = $appreg.displayName
         }
