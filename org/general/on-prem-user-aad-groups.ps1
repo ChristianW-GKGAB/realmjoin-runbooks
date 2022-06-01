@@ -14,18 +14,18 @@ Name of the Group to migrate from.
 #>
 
 param(
+    [Parameter(Mandatory = $true)]
     [string] $AAdGroupIDs = "",
     [Parameter(Mandatory = $true)]
     [string] $MigGroupName = ""
 )
-$AAdGroupIDs.Split(',')
+$AADGroupIDArray =  $AAdGroupIDs.Split(',')
 
-Connect-MgGraph 
-Update-MSGraphEnvironment -SchemaVersion "Beta" -Quiet
+Connect-MgGraph -Scopes "User.Read.All","Group.ReadWrite.All"
 
 
 $AADGroups = @()
-foreach($AADGroupID in $AAdGroupIDs){
+foreach($AADGroupID in $AADGroupIDArray){
     $AADGroups += Get-MgGroupMember -GroupId $AADGroupID
 }
 
@@ -33,22 +33,26 @@ $AllUsers = Get-ADUser -Properties whencreated -Filter *
 $beforedate = (Get-Date).AddDays(-1)
 
 $MigGroupMemberGUIDs = get-ADGroupMember -Identity $MigGroupName -Recursive | Select-Object -ExpandProperty ObjectGUID
+$MigGroupMemberGUIDs
 $NewUsers = @()
 foreach($User in $AllUsers){
     if(($User.whencreated -gt $beforedate) -or ($MigGroupMemberGUIDs.Contains($User.ObjectGUID))){
         $NewUsers += $User
     }
 }
+$AllAADUsers = Get-MgUser -Count userCount -ConsistencyLevel eventual -Property onPremisesUserPrincipalName,Id,userPrincipalName
 $AADUsers = @()
 foreach ($NewUser in $NewUsers){
-   $AADUsers += Get-MgUser -Count userCount -ConsistencyLevel eventual -Property onPremisesUserPrincipalName,Id,userPrincipalName -Filter "onPremisesUserPrincipalName eq $($NewUser.UserPrincipalName)"
+   $AADUsers += $AllAADUsers | Where-Object {$_.OnPremisesUserPrincipalName -eq $NewUser.UserPrincipalName }
+   "## added $($NewUser.userPrincipalName) to AAD Users"
 }
 foreach($AADGroup in $AADGroups){
     $AADGroupMembers = @()
     $AADGroupMembers += Get-MgGroupMember -Identity $AADGroup.id -Recursive | Select-Object -ExpandProperty id
     foreach($AADUser in $AADUsers){
         if(!($ADgroupMembers.contains($AADUser.id))){
-            New-MgGroupMember -GroupId $AADGroup.id -DirectoryObjectId $AADUser.Id
+            New-MgGroupMember -GroupId $AADGroup.id -DirectoryObjectId $AADUser.id
+            "## added $($AADUser.UserPrincipalName) to $($AADGroup.DisplayName)"
         }
     }
     
