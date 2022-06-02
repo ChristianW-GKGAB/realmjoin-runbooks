@@ -14,11 +14,13 @@ Autopilot GroupTag to assign to the devices.
 #>
 
 param(
-    [string] $serialNumberList = "",
+    [string] $serialNumberList = "2420-9612-6985-2910-0353-1045-54,9507-1125-2110-0085-4353-7748-30",
     [string] $inputFile = "",
     [Parameter(Mandatory = $true)]
     [string] $groupTag = ""
 )
+
+Import-Module Microsoft.Graph.Intune
 
 if ((-not $serialNumberList) -and (-not $inputFile)) {
     "Please use either '-serialNumberList' or '-inputFile' to give a list serial numbers."
