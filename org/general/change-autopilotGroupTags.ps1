@@ -28,10 +28,12 @@ Autopilot GroupTag to assign to the devices.
 #>
 
 param(
-    [string] $serialNumberList = "",
-    [string] $inputFile = "",
+    [string] $serialNumberList ,
+    [string] $inputFile,
     [Parameter(Mandatory = $true)]
-    [string] $groupTag = ""
+    [string] $groupTag,
+    [Parameter(Mandatory = $true)]
+    [string] $CallerName
 )
 
 #Requires -Modules @{ModuleName = "RealmJoin.RunbookHelper"; ModuleVersion = "0.6.0" }
