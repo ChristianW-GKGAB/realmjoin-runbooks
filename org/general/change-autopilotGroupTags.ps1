@@ -10,7 +10,8 @@ A file, containing a comma separated list of serial numbers (devices).
 
 .PARAMETER groupTag
 Autopilot GroupTag to assign to the devices.
-  .NOTES
+
+.NOTES
   Permissions
   MS Graph (API):
   - Directory.Read.All
@@ -28,10 +29,14 @@ Autopilot GroupTag to assign to the devices.
 #>
 
 param(
-    [string] $serialNumberList ,
+    [Parameter(Mandatory = $true)]
+    [ValidateScript( { Use-RJInterface -DisplayName "list of serialnumbers seperated by ," } )]
+    [string] $serialNumberList,
     [string] $inputFile,
+    [ValidateScript( { Use-RJInterface -DisplayName "new group Tag" } )]
     [Parameter(Mandatory = $true)]
     [string] $groupTag,
+    # CallerName is tracked purely for auditing purposes
     [Parameter(Mandatory = $true)]
     [string] $CallerName
 )
@@ -55,17 +60,19 @@ if (-not $serialNumberList) {
 
 # Connecting
 Connect-RjRbGraph
+try {
+    # Get all autopilot devices (even if more than 1000)
+    $autopilotDevices = Invoke-RjRbRestMethodGraph -Resource "/deviceManagement/windowsAutopilotDeviceIdentities" 
 
-# Get all autopilot devices (even if more than 1000)
-#$autopilotDevices = Invoke-MSGraphRequest -HttpMethod GET -Url "deviceManagement/windowsAutopilotDeviceIdentities" | Get-MSGraphAllPages
+    $serialnumbers = $serialNumberList.Split(',')
+    $requestBody = @{"groupTag" = $groupTag }
 
-$serialnumbers = $serialNumberList.Split(',')
-$requestBody = @{"groupTag" =  $groupTag}
-
-foreach ($serialnumber in $serialnumbers) {
-    Write-Output "Updating entity: $serialnumber | groupTag: $groupTag | orderIdentifier: $($autopilotDevice.orderIdentifier)"
-    Invoke-RjRbRestMethodGraph -Resource "deviceManagement/windowsAutopilotDeviceIdentities/$serialnumber/UpdateDeviceProperties" -Body $requestBody 
+    foreach ($serialnumber in $serialnumbers) {
+        $autopilotDevice = $autopilotDevices | Where-Object { $_.serialNumber -eq $serialnumber }
+        Write-Output "Updating entity: $serialnumber | groupTag: $groupTag | orderIdentifier: $($autopilotDevice.orderIdentifier)"
+        Invoke-RjRbRestMethodGraph -Resource "/deviceManagement/windowsAutopilotDeviceIdentities/$($autopilotDevice.id)/UpdateDeviceProperties" -Body $requestBody 
+    }
 }
-
-# Invoke an autopilot service sync
-Invoke-RjRbRestMethodGraph -Resource "deviceManagement/windowsAutopilotSettings/sync"
+catch {
+    $_
+}
