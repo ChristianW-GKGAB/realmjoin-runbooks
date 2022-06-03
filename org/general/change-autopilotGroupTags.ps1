@@ -29,7 +29,6 @@ Autopilot GroupTag to assign to the devices.
 #>
 
 param(
-    [Parameter(Mandatory = $true)]
     [ValidateScript( { Use-RJInterface -DisplayName "list of serialnumbers seperated by ," } )]
     [string] $serialNumberList,
     [string] $inputFile,
