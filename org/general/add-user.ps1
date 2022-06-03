@@ -332,11 +332,11 @@ if ($DefaultLicense -ne "") {
     }
     else {
         if ($group.displayName -eq "lic - default CP IUR (O365)") {
-            $WinEntE5 = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/1e7e1070-8ccb-4aca-b470-d7cb538cb07e" 
-            $EMSPREMIUM = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/b05e124f-c7cc-45a0-a6aa-8cf78c946968"
-            $PremiumNoAudio = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/26d45bd9-adf1-46cd-a9e1-51e9a5524128"
-            $MCOMEETADV = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/0c266dff-15dd-4b49-8397-2bb16070ed52"
-            $MCOPSTN_5 = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/11dee6af-eca8-419f-8061-6864517c1875"
+            $WinEntE5 = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus" | Where-Object {$_.skuIs -eq "1e7e1070-8ccb-4aca-b470-d7cb538cb07e"}
+            $EMSPREMIUM = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/" | Where-Object {$_.skuIs -eq "b05e124f-c7cc-45a0-a6aa-8cf78c946968"}
+            $PremiumNoAudio = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/" | Where-Object {$_.skuIs -eq "26d45bd9-adf1-46cd-a9e1-51e9a5524128"}
+            $MCOMEETADV = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/" | Where-Object {$_.skuIs -eq "0c266dff-15dd-4b49-8397-2bb16070ed52"}
+            $MCOPSTN_5 = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/" | Where-Object {$_.skuIs -eq "11dee6af-eca8-419f-8061-6864517c1875"}
             $WinEntE5remaining = $WinEntE5.prepaidUnits.enabled - $WinEntE5.consumedUnits
             $EMSPREMIUMremaining = $EMSPREMIUM.prepaidUnits.enabled - $EMSPREMIUM.consumedUnits
             $PremiumNoAudioremaining = $PremiumNoAudio.prepaidUnits.enabled - $PremiumNoAudio.consumedUnits
