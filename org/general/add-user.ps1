@@ -244,6 +244,7 @@ if ($CompanyName -eq "") {
 }
 
 
+
 $newUserArgs = [ordered]@{
     userPrincipalName = $UserPrincipalName
     mailNickName      = $MailNickname
@@ -330,18 +331,71 @@ if ($DefaultLicense -ne "") {
         Write-Error "License group $DefaultLicense not found!"
     }
     else {
-        "## Adding to license group '$($group.displayName)'"
-        $body = @{
-            "@odata.id" = "https://graph.microsoft.com/v1.0/directoryObjects/$($userObject.id)"
+        if ($group.displayName -eq "lic - default CP IUR (O365)") {
+            $WinEntE5 = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/1e7e1070-8ccb-4aca-b470-d7cb538cb07e" 
+            $EMSPREMIUM = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/b05e124f-c7cc-45a0-a6aa-8cf78c946968"
+            $PremiumNoAudio = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/26d45bd9-adf1-46cd-a9e1-51e9a5524128"
+            $MCOMEETADV = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/0c266dff-15dd-4b49-8397-2bb16070ed52"
+            $MCOPSTN_5 = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/11dee6af-eca8-419f-8061-6864517c1875"
+            $WinEntE5remaining = $WinEntE5.prepaidUnits.enabled - $WinEntE5.consumedUnits
+            $EMSPREMIUMremaining = $EMSPREMIUM.prepaidUnits.enabled - $EMSPREMIUM.consumedUnits
+            $PremiumNoAudioremaining = $PremiumNoAudio.prepaidUnits.enabled - $PremiumNoAudio.consumedUnits
+            $MCOMEETADVremaining = $MCOMEETADV.prepaidUnits.enabled - $MCOMEETADV.consumedUnits
+            $MCOPSTN_5remaining = $MCOPSTN_5.prepaidUnits.enabled - $MCOPSTN_5.consumedUnits
+            if (($WinEntE5remaining -gt 0) -and ($EMSPREMIUMremaining -gt 0) -and ($PremiumNoAudioremaining -gt 0) -and ($MCOMEETADVremaining -gt 0) -and ( $MCOPSTN_5remaining -gt 0)) {
+                "## Adding to license group '$($group.displayName)'"
+                $body = @{
+                    "@odata.id" = "https://graph.microsoft.com/v1.0/directoryObjects/$($userObject.id)"
+                }
+                try {
+                    Invoke-RjRbRestMethodGraph -Resource "/groups/$($group.id)/members/`$ref" -Method Post -Body $body | Out-Null
+                    #"## '$($group.displayName)' is assigned to '$UserPrincipalName'"
+                }
+                catch {
+                    "## ... failed. Skipping '$($group.displayName)'. See Errorlog."
+                    Write-RjRbLog $_
+                }
+            }
+            else {
+                "## no licenses remaining"
+            }
         }
-        try {
-            Invoke-RjRbRestMethodGraph -Resource "/groups/$($group.id)/members/`$ref" -Method Post -Body $body | Out-Null
-            #"## '$($group.displayName)' is assigned to '$UserPrincipalName'"
+        elseif ($group.displayName -eq "lic - default DR IUR (M365)") {
+            $SPE_E5 = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/06ebc4ee-1bb5-47dd-8120-11324bc54e06"
+            $SPE_E5remaining = $SPE_E5.prepaidUnits.enabled - $SPE_E5.consumedUnits
+            if ($SPE_E5remaining -gt 0) {
+                "## Adding to license group '$($group.displayName)'"
+                $body = @{
+                    "@odata.id" = "https://graph.microsoft.com/v1.0/directoryObjects/$($userObject.id)"
+                }
+                try {
+                    Invoke-RjRbRestMethodGraph -Resource "/groups/$($group.id)/members/`$ref" -Method Post -Body $body | Out-Null
+                    #"## '$($group.displayName)' is assigned to '$UserPrincipalName'"
+                }
+                catch {
+                    "## ... failed. Skipping '$($group.displayName)'. See Errorlog."
+                    Write-RjRbLog $_
+                }
+            }
+            else {
+                "## no licenses remaining"
+            }
         }
-        catch {
-            "## ... failed. Skipping '$($group.displayName)'. See Errorlog."
-            Write-RjRbLog $_
+        else {
+            "## Adding to license group '$($group.displayName)'"
+            $body = @{
+                "@odata.id" = "https://graph.microsoft.com/v1.0/directoryObjects/$($userObject.id)"
+            }
+            try {
+                Invoke-RjRbRestMethodGraph -Resource "/groups/$($group.id)/members/`$ref" -Method Post -Body $body | Out-Null
+                #"## '$($group.displayName)' is assigned to '$UserPrincipalName'"
+            }
+            catch {
+                "## ... failed. Skipping '$($group.displayName)'. See Errorlog."
+                Write-RjRbLog $_
+            }
         }
+        
     }
 }
 
