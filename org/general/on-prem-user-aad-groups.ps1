@@ -17,7 +17,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string] $AAdGroupIDs = "",
     [Parameter(Mandatory = $true)]
-    [string] $MigGroupName = ""
+    [string] $MigGroupName = "",
+    [Parameter(Mandatory = $true)]
+    [string] $logsFolder = ""
 )
 
 
@@ -56,4 +58,14 @@ foreach($AADGroup in $AADGroups){
         }
     }
     
+}
+$time = get-date -Format "yyyyMMddTHH"
+$logs | Out-File "$logsFolder\logs-$time.txt"
+
+
+#Delete files older than 1 month
+Get-ChildItem $logsFolder -Recurse -Force -ea 0 |
+Where-Object {!$_.PsIsContainer -and $_.LastWriteTime -lt (Get-Date).AddDays(-30)} |
+ForEach-Object {
+   $_ | Remove-Item -Force
 }

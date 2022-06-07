@@ -7,6 +7,7 @@ add on prem Users to a AAD Groups.
 
 [string] $MigGroupName = ""
 [string] $AAdGroupIDs = ""
+[string] $logsFolder = ""
 
 Connect-MgGraph -Scopes "User.Read.All","Group.ReadWrite.All"
 
@@ -21,6 +22,7 @@ foreach($AADGroupID in $AADGroupIDArray){
 
 $MigGroupMemberGUIDs = get-ADGroupMember -Identity $MigGroupName -Recursive | Select-Object -ExpandProperty ObjectGUID
 $NewUsers = @()
+$logs = @()
 foreach($User in $AllUsers){
     if(($User.whencreated -gt $beforedate) -or ($MigGroupMemberGUIDs.Contains($User.ObjectGUID))){
         $NewUsers += $User
@@ -31,6 +33,7 @@ $AADUsers = @()
 foreach ($NewUser in $NewUsers){
    $AADUsers += $AllAADUsers | Where-Object {$_.OnPremisesUserPrincipalName -eq $NewUser.UserPrincipalName }
 }
+
 foreach($AADGroup in $AADGroups){
     
     $AADGroupMembers = @()
@@ -39,8 +42,18 @@ foreach($AADGroup in $AADGroups){
     foreach($AADUser in $AADUsers){
         if(!($AADgroupMembers.contains($AADUser.id))){
             New-MgGroupMember -GroupId $AADGroup.id -DirectoryObjectId $AADUser.id
-            "## added $($AADUser.UserPrincipalName) to $($AADGroup.DisplayName)"
+            $logs += "## added $($AADUser.UserPrincipalName) to $($AADGroup.DisplayName)"
         }
     }
     
+}
+$time = get-date -Format "yyyyMMddTHH"
+$logs | Out-File "$logsFolder\logs-$time.txt"
+
+
+#Delete files older than 1 month
+Get-ChildItem $logsFolder -Recurse -Force -ea 0 |
+Where-Object {!$_.PsIsContainer -and $_.LastWriteTime -lt (Get-Date).AddDays(-30)} |
+ForEach-Object {
+   $_ | Remove-Item -Force
 }
