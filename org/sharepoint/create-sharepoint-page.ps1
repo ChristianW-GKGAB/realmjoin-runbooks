@@ -51,63 +51,31 @@ param (
 
 Connect-RjRbGraph
 
-$body = @{
-    "name"= "$PageName.aspx";
-    "title"= "$PageTitle";
-    "publishingState" = @{
-        "level" = "checkedOut";
-        "versionId" = "0.1"
-    };
-    "webParts"= @(
-        @{
-            "type"= "rte";
-            "data"= @{
-                "innerHTML"= "<p>$Headline</p>"
-            }
-        };
-        @{
-            "type"= "d1d91016-032f-456d-98a4-721247c305e8";
-            "data"= @{
-                "title" = $WebpartTitle;
-                "description"= $Webpartdescription;
-                "serverProcessedContent"= @{
-                    "htmlStrings"= @{};
-                    "searchablePlainTexts"= @{
-                        "title"= ""
-                    };
-                    "imageSources"= @{};
-                    "links"= @{
-                        "baseUrl"= "https://www.contoso.com/sites/Engineering"
-                    };
-                    "componentDependencies"= @{
-                        "layoutComponentId"= "8ac0c53c-e8d0-4e3e-87d0-7449eb0d4027"
-                    }
-                };
-                "dataVersion"= "1.0";
-                "properties"= @{
-                    "selectedListId"= "032e08ab-89b0-4d8f-bc10-73094233615c";
-                    "selectedCategory"= "";
-                    "dateRangeOption"= 0;
-                    "startDate"= "";
-                    "endDate"= "";
-                    "isOnSeeAllPage"= $false;
-                    "layoutId"= "FilmStrip";
-                    "dataProviderId"= "Event";
-                    "webId"= "0764c419-1ecc-4126-ba32-0c25ae0fffe8";
-                    "siteId"= "6b4ffc7a-cfc2-4a76-903a-1cc3686dee23"
-                }
-            }
-        }
-    )
-}
+$site = Invoke-RjRbRestMethodGraph -Resource "/sites/$siteId"
+if ($site) {
+    $innerHTML = @{"innerHTML" = "<p>$Headline</p>" }
+    $publishingstate = @{"level" = "checkedOut"; "versionId" = "0.1" }
+    $serverProcessedContent = @{"htmlStrings" = @{}; "searchablePlainTexts" = @{"title" = "" }; "imageSources" = @{}; "links" = @{"baseUrl" = $site.webUrl }; "componentDependencies" = @{"layoutComponentId" = "8ac0c53c-e8d0-4e3e-87d0-7449eb0d4027" } }
+  
+    $properties = @{"selectedListId" = "032e08ab-89b0-4d8f-bc10-73094233615c"; "selectedCategory" = ""; "dateRangeOption" = 0; "startDate" = ""; "endDate" = ""; "isOnSeeAllPage" = $true; "layoutId" = "FilmStrip"; "dataProviderId" = "Event"; "webId" = "0764c419-1ecc-4126-ba32-0c25ae0fffe8"; "siteId" = $siteId }
 
+    $webpart2data = @{"title" = $WebpartTitle; "description" = $Webpartdescription; "serverProcessedContent" = $serverProcessedContent; "dataVersion" = "1.0"; "properties" = $properties }
 
-<#
+    $webparts = @(@{"type" = "rte"; "data" = $innerHTML }, @{"type" = "d1d91016-032f-456d-98a4-721247c305e8"; "data" = $webpart2data })
+
+    $body = @{"name" = "$PageName.aspx"; "title" = $PageTitle; "publishingState" = $publishingstate; "webParts" = $webparts }
+        
+
+    <#
 $publishingstate = @{"level"= $level; "versionId" = $versionId}
 $webparts = @[]
 $body = @{"name" = $name ; "title" = $title; "publishingState" = $publishingstate;}
 #>
-$body
+    $bodyjson = $body | ConvertTo-Json -Depth 5
+    $bodyjson
 
-Invoke-RjRbRestMethodGraph -Resource "/sites/$($siteId)/pages" -Body $body -Beta
-
+    Invoke-RjRbRestMethodGraph -Resource "/sites/$siteId/pages" -Body $bodyjson -Method Post -Beta
+}
+else {
+    "## the specified siteId is invalid."
+}
