@@ -325,7 +325,8 @@ if ($ManagerId) {
 # Assign the default license. Continue even if this fails.
 if ($DefaultLicense -ne "") {
     #"Searching license group $DefaultLicense."
-    $group = Invoke-RjRbRestMethodGraph -Resource "/groups" -OdFilter "displayName eq '$DefaultLicense'" -ErrorAction SilentlyContinue
+    $group = Invoke-RjRbRestMethodGraph -Resource "/groups" -OdFilter "displayName eq '$DefaultLicense'" -OdSelect "displayName, assignedLicenses" -ErrorAction SilentlyContinue
+
     if (-not $group) {
         "License group $DefaultLicense not found!"
         Write-Error "License group $DefaultLicense not found!"
@@ -377,11 +378,22 @@ if ($DefaultLicense -ne "") {
                     Write-RjRbLog $_
                 }
             }
+            
             else {
                 "## no licenses remaining"
             }
         }
         else {
+            $licenses = $group.assignedLicenses
+            $enoughlicenses = $true
+            foreach($license in $licenses){
+                $sku = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus" | Where-Object {$_.skuID -eq $license.skuId}
+                $SkuRemaining = $sku.prepaidUnits.enabled - $sku.consumedUnits
+                if($SkuRemaining -le 0){
+                    $enoughlicenses = $false
+                }
+            }
+            if($enoughlicenses){
             "## Adding to license group '$($group.displayName)'"
             $body = @{
                 "@odata.id" = "https://graph.microsoft.com/v1.0/directoryObjects/$($userObject.id)"
@@ -394,6 +406,10 @@ if ($DefaultLicense -ne "") {
                 "## ... failed. Skipping '$($group.displayName)'. See Errorlog."
                 Write-RjRbLog $_
             }
+        }else{
+            "## Licensegroup $DefaultLicense lacks sufficient licenses, not provisioning"
+
+        }
         }
         
     }
