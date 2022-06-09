@@ -333,11 +333,11 @@ if ($DefaultLicense -ne "") {
     }
     else {
         if ($group.displayName -eq "lic - default CP IUR (O365)") {
-            $WinEntE5 = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus" | Where-Object {$_.skuID -eq "1e7e1070-8ccb-4aca-b470-d7cb538cb07e"}
-            $EMSPREMIUM = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/" | Where-Object {$_.skuID -eq "b05e124f-c7cc-45a0-a6aa-8cf78c946968"}
-            $PremiumNoAudio = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/" | Where-Object {$_.skuID -eq "26d45bd9-adf1-46cd-a9e1-51e9a5524128"}
-            $MCOMEETADV = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/" | Where-Object {$_.skuID -eq "0c266dff-15dd-4b49-8397-2bb16070ed52"}
-            $MCOPSTN_5 = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/" | Where-Object {$_.skuID -eq "11dee6af-eca8-419f-8061-6864517c1875"}
+            $WinEntE5 = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus" | Where-Object { $_.skuID -eq "1e7e1070-8ccb-4aca-b470-d7cb538cb07e" }
+            $EMSPREMIUM = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/" | Where-Object { $_.skuID -eq "b05e124f-c7cc-45a0-a6aa-8cf78c946968" }
+            $PremiumNoAudio = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/" | Where-Object { $_.skuID -eq "26d45bd9-adf1-46cd-a9e1-51e9a5524128" }
+            $MCOMEETADV = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/" | Where-Object { $_.skuID -eq "0c266dff-15dd-4b49-8397-2bb16070ed52" }
+            $MCOPSTN_5 = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus/" | Where-Object { $_.skuID -eq "11dee6af-eca8-419f-8061-6864517c1875" }
             $WinEntE5remaining = $WinEntE5.prepaidUnits.enabled - $WinEntE5.consumedUnits
             $EMSPREMIUMremaining = $EMSPREMIUM.prepaidUnits.enabled - $EMSPREMIUM.consumedUnits
             $PremiumNoAudioremaining = $PremiumNoAudio.prepaidUnits.enabled - $PremiumNoAudio.consumedUnits
@@ -386,30 +386,31 @@ if ($DefaultLicense -ne "") {
         else {
             $licenses = $group.assignedLicenses
             $enoughlicenses = $true
-            foreach($license in $licenses){
-                $sku = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus" | Where-Object {$_.skuID -eq $license.skuId}
+            foreach ($license in $licenses) {
+                $sku = Invoke-RjRbRestMethodGraph -Resource "/subscribedSkus" | Where-Object { $_.skuID -eq $license.skuId }
                 $SkuRemaining = $sku.prepaidUnits.enabled - $sku.consumedUnits
-                if($SkuRemaining -le 0){
+                if ($SkuRemaining -le 0) {
                     $enoughlicenses = $false
                 }
             }
-            if($enoughlicenses){
-            "## Adding to license group '$($group.displayName)'"
-            $body = @{
-                "@odata.id" = "https://graph.microsoft.com/v1.0/directoryObjects/$($userObject.id)"
+            if ($enoughlicenses) {
+                "## Adding to license group '$($group.displayName)'"
+                $body = @{
+                    "@odata.id" = "https://graph.microsoft.com/v1.0/directoryObjects/$($userObject.id)"
+                }
+                try {
+                    Invoke-RjRbRestMethodGraph -Resource "/groups/$($group.id)/members/`$ref" -Method Post -Body $body | Out-Null
+                    #"## '$($group.displayName)' is assigned to '$UserPrincipalName'"
+                }
+                catch {
+                    "## ... failed. Skipping '$($group.displayName)'. See Errorlog."
+                    Write-RjRbLog $_
+                }
             }
-            try {
-                Invoke-RjRbRestMethodGraph -Resource "/groups/$($group.id)/members/`$ref" -Method Post -Body $body | Out-Null
-                #"## '$($group.displayName)' is assigned to '$UserPrincipalName'"
-            }
-            catch {
-                "## ... failed. Skipping '$($group.displayName)'. See Errorlog."
-                Write-RjRbLog $_
-            }
-        }else{
-            "## Licensegroup $DefaultLicense lacks sufficient licenses, not provisioning"
+            else {
+                "## Licensegroup $DefaultLicense lacks sufficient licenses, not provisioning"
 
-        }
+            }
         }
         
     }
