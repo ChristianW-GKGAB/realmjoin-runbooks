@@ -53,7 +53,7 @@ Connect-RjRbGraph
 
 $site = Invoke-RjRbRestMethodGraph -Resource "/sites/$siteId"
 if ($site) {
-    $innerHTML = @{"innerHTML" = "<p>$Headline</p>" }
+    <#$innerHTML = @{"innerHTML" = "<p>$Headline</p>" }
     $publishingstate = @{"level" = "checkedOut"; "versionId" = "0.1" }
     $serverProcessedContent = @{"htmlStrings" = @{}; "searchablePlainTexts" = @{"title" = "" }; "imageSources" = @{}; "links" = @{"baseUrl" = $site.webUrl }; "componentDependencies" = @{"layoutComponentId" = "8ac0c53c-e8d0-4e3e-87d0-7449eb0d4027" } }
   
@@ -64,17 +64,31 @@ if ($site) {
     $webparts = @(@{"type" = "rte"; "data" = $innerHTML }, @{"type" = "d1d91016-032f-456d-98a4-721247c305e8"; "data" = $webpart2data })
 
     $body = @{"name" = "$PageName.aspx"; "title" = $PageTitle; "publishingState" = $publishingstate; "webParts" = $webparts }
-        
+     #>   
+    $body = @'
+    {
+        "name": "$hallo.aspx",
+        "title": "PageTitle",
+        "publishingState": {
+            "level": "checkedOut",
+            "versionId": "0.1"
+        },
+        "webParts": [
+            {
+                    "type": "rte",
+                    "data": {
+                        "innerHTML": "<p>Please stop by the HR offices to pick up the new 401K packets. These packets contain all the information you need to set up or update your 401K for the new year.</p>"
+                    }
+                }
+        ]
+    }
+'@
 
-    <#
-$publishingstate = @{"level"= $level; "versionId" = $versionId}
-$webparts = @[]
-$body = @{"name" = $name ; "title" = $title; "publishingState" = $publishingstate;}
-#>
-    $bodyjson = $body | ConvertTo-Json -Depth 5
-    $bodyjson
 
-    Invoke-RjRbRestMethodGraph -Resource "/sites/$siteId/pages" -Body $bodyjson -Method Post -Beta
+
+    $bodyps = $body | ConvertFrom-Json 
+
+    Invoke-RjRbRestMethodGraph -Resource "/sites/$siteId/pages" -Method Post -Body $bodyps  -Beta
 }
 else {
     "## the specified siteId is invalid."
