@@ -163,7 +163,6 @@ param (
     [string]$State,
     [string]$Country,
     [string]$UsageLocation,
-    [Parameter(Mandatory = $true)]
     [ValidateScript( { Use-RJInterface -DisplayName "License group to assign" } )]
     [string]$DefaultLicense = "",
     [string]$DefaultGroups = "",
@@ -403,7 +402,7 @@ if ($DefaultLicense -ne "") {
             }
             catch {
                 "## ... failed. Skipping '$($group.displayName)'. See Errorlog."
-                "## $_"
+                #"## $_"
                 Write-RjRbLog $_
             }
         }
