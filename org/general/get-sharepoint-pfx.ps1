@@ -33,9 +33,7 @@ Function get-DownloadSPFolder() {
             New-Item -ItemType Directory -Path $LocalFolder | Out-Null
  
         }
- 
-          
- 
+
         #Get all Files from the folder
  
         $FilesColl = $SourceFolder.Files
@@ -43,32 +41,29 @@ Function get-DownloadSPFolder() {
         $Ctx.Load($FilesColl)
  
         $Ctx.ExecuteQuery()
- 
-  
- 
+
         #Iterate through each file and download
  
-        Foreach ($File in $FilesColl)
-        {
+        Foreach ($File in $FilesColl) {
+            $Fileending = $File.Name.Split(".")[($File.Name.Split(".").length) - 1]
+            if ($Fileending -eq "pfx") {
  
-            $TargetFile = $LocalFolder + "\" + $File.Name
+                $TargetFile = $LocalFolder + "\" + $File.Name
  
-            #Download the fileS
+                #Download the fileS
  
-            $FileInfo = [Microsoft.SharePoint.Client.File]::OpenBinaryDirect($Ctx, $File.ServerRelativeURL)
+                $FileInfo = [Microsoft.SharePoint.Client.File]::OpenBinaryDirect($Ctx, $File.ServerRelativeURL)
  
-            $WriteStream = [System.IO.File]::Open($TargetFile, [System.IO.FileMode]::Create)
+                $WriteStream = [System.IO.File]::Open($TargetFile, [System.IO.FileMode]::Create)
  
-            $FileInfo.Stream.CopyTo($WriteStream)
+                $FileInfo.Stream.CopyTo($WriteStream)
  
-            $WriteStream.Close()
+                $WriteStream.Close()
  
-            write-host -f Green "Downloaded File:"$TargetFile
- 
+                write-host -f Green "Downloaded File:"$TargetFile
+            }
         }
- 
-          
- 
+
         #Process Sub Folders
  
         $SubFolders = $SourceFolder.Folders
@@ -77,11 +72,9 @@ Function get-DownloadSPFolder() {
  
         $Ctx.ExecuteQuery()
  
-        Foreach ($Folder in $SubFolders)
-        {
+        Foreach ($Folder in $SubFolders) {
  
-            If ($Folder.Name -ne "Forms")
-            {
+            If ($Folder.Name -ne "Forms") {
  
                 #Call the function recursively
  
@@ -117,6 +110,7 @@ $Usernames = Import-Csv -Path "$csvpath"
 
 #Get all OneDrive for Business Site collections
 $AllOneDriveSites = Get-SPOSite -Template "SPSPERS" -Limit ALL -IncludePersonalSite $True
+$OneDriveSites = @()
 foreach ($Username in $Usernames.Usernames) {
     $OneDriveSites += $AllOneDriveSites | Where-Object { $_.Owner -contains $Username }
 }
@@ -141,6 +135,5 @@ Foreach ($Site in $OneDriveSites) {
     $Downloadpath = "$destinationfolder\$userfolder"
     get-DownloadSPFolder -SiteURL $Site.Url -SourceFolder $SourceFolder -TargetFolder $Downloadpath
     Set-SPOUser -Site $Site.Url -LoginName $Admin -IsSiteCollectionAdmin $false
-    $site
 }
 Write-Host "Site Collection Admin Added to All OneDrive Sites Successfully!" -f Green
