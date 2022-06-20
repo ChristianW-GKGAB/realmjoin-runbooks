@@ -26,9 +26,7 @@ Function get-DownloadSPFolder() {
     Try {
         #Create Local Folder, if it doesn't exist
 
-        $FolderName = ($SourceFolder.ServerRelativeURL) -replace "/", "\"
-
-        $LocalFolder = $TargetFolder + $FolderName
+        $LocalFolder = $TargetFolder 
  
         If (!(Test-Path -Path $LocalFolder)) {
  
