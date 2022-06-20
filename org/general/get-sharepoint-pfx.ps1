@@ -15,79 +15,134 @@ param(
     $destinationfolder
 )
 
+import-module Microsoft.Online.SharePoint.PowerShell
  
-Function get-DownloadSPFolder($SPFolderURL, $DownloadPath)
-{
+Function get-DownloadSPFolder() {
+    param(
+        [Parameter(Mandatory = $true)] [string] $SiteURL,
+        [Parameter(Mandatory = $true)] [Microsoft.SharePoint.Client.Folder] $SourceFolder,
+        [Parameter(Mandatory = $true)] [string] $TargetFolder
+    )
     Try {
-        #Get the Source SharePoint Folder
-        $SPFolder = $web.GetFolder($SPFolderURL)
-        Write-host $SPFolder
-        $DownloadPath = Join-Path $DownloadPath $SPFolder.Name
-   
-        #Ensure the destination local folder exists!
-        If (!(Test-Path -path $DownloadPath))
-        {   
-            #If it doesn't exists, Create
-            New-Item $DownloadPath -type directory
+        #Create Local Folder, if it doesn't exist
+
+        $FolderName = ($SourceFolder.ServerRelativeURL) -replace "/", "\"
+
+        $LocalFolder = $TargetFolder + $FolderName
+ 
+        If (!(Test-Path -Path $LocalFolder)) {
+ 
+            New-Item -ItemType Directory -Path $LocalFolder | Out-Null
+ 
         }
-     
-        #Loop through each file in the folder and download it to Destination
-        ForEach ($File in $SPFolder.Files)
+ 
+          
+ 
+        #Get all Files from the folder
+ 
+        $FilesColl = $SourceFolder.Files
+ 
+        $Ctx.Load($FilesColl)
+ 
+        $Ctx.ExecuteQuery()
+ 
+  
+ 
+        #Iterate through each file and download
+ 
+        Foreach ($File in $FilesColl)
         {
-            #Download the file
-            $Data = $File.OpenBinary()
-            $FilePath= Join-Path $DownloadPath $File.Name
-            [System.IO.File]::WriteAllBytes($FilePath, $data)
-            Write-host -f Green "`tDownloaded the File:"$File.ServerRelativeURL        
+ 
+            $TargetFile = $LocalFolder + "\" + $File.Name
+ 
+            #Download the fileS
+ 
+            $FileInfo = [Microsoft.SharePoint.Client.File]::OpenBinaryDirect($Ctx, $File.ServerRelativeURL)
+ 
+            $WriteStream = [System.IO.File]::Open($TargetFile, [System.IO.FileMode]::Create)
+ 
+            $FileInfo.Stream.CopyTo($WriteStream)
+ 
+            $WriteStream.Close()
+ 
+            write-host -f Green "Downloaded File:"$TargetFile
+ 
         }
-     
-        #Process the Sub Folders & Recursively call the function
-        ForEach ($SubFolder in $SPFolder.SubFolders)
+ 
+          
+ 
+        #Process Sub Folders
+ 
+        $SubFolders = $SourceFolder.Folders
+ 
+        $Ctx.Load($SubFolders)
+ 
+        $Ctx.ExecuteQuery()
+ 
+        Foreach ($Folder in $SubFolders)
         {
-            
-                #Call the function Recursively
-                get-DownloadSPFolder $SubFolder $DownloadPath
-            
+ 
+            If ($Folder.Name -ne "Forms")
+            {
+ 
+                #Call the function recursively
+ 
+                Download-SPOFolder -SiteURL $SiteURL -SourceFolder $Folder -TargetFolder $TargetFolder
+ 
+            }
+ 
         }
+ 
     }
+ 
     Catch {
-        Write-host -f Red "Error Downloading Document Library:" $_.Exception.Message
-    } 
+ 
+        write-host -f Red "Error Downloading Folder!" $_.Exception.Message
+ 
+    }
+ 
 }
 
 #Setup Credentials to connect
 
-$cred  = Get-Credential -UserName $admin -Message GlobalAdminLogin
+$cred = Get-Credential -UserName $admin -Message GlobalAdminLogin
 
 Connect-SPOService -Url $BaseUrl -Credential $cred
 
 $Credentials = New-Object Microsoft.SharePoint.Client.SharePointOnlineCredentials($Cred.Username, $Cred.Password)
 
- Import-Csv -LiteralPath 
+$FolderRelativeUrl = "/Documents/SMIME/"
 
-#Setup the context
+#Connect to SharePoint Online Admin Center
 
-$Ctx = New-Object Microsoft.SharePoint.Client.ClientContext($SiteURL)
+$Usernames = Import-Csv -Path "$csvpath"
 
-$Ctx.Credentials = $Credentials
- #Connect to SharePoint Online Admin Center
+#Get all OneDrive for Business Site collections
+$AllOneDriveSites = Get-SPOSite -Template "SPSPERS" -Limit ALL -IncludePersonalSite $True
+foreach ($Username in $Usernames.Usernames) {
+    $OneDriveSites += $AllOneDriveSites | Where-Object { $_.Owner -contains $Username }
+}
+#Add Site Collection Admin to each OneDrive
+Foreach ($Site in $OneDriveSites) {
+    Write-Host -f Yellow "Adding Site Collection Admin to: "$Site.URL
+    Set-SPOUser -Site $Site.Url -LoginName $Admin -IsSiteCollectionAdmin $True
+    $Ctx = New-Object Microsoft.SharePoint.Client.ClientContext($Site.Url)
+    $Ctx.Credentials = $Credentials
+    $Web = $Ctx.web
+    $Ctx.Load($Web)
+    $Ctx.ExecuteQuery()
+    $Web.ServerRelativeUrl + $FolderRelativeUrl
+    #Get the Folder
 
- $Usernames =  Import-Csv -Path $csvpath
+    $SourceFolder = $Web.GetFolderByServerRelativeUrl($Web.ServerRelativeUrl + $FolderRelativeUrl)
 
-  #Get all OneDrive for Business Site collections
- $AllOneDriveSites = Get-SPOSite -Template "SPSPERS" -Limit ALL -IncludePersonalSite $True
- $OneDriveSites = $AllOneDriveSites | Where-Object {$_.Owner -eq $Usernames}
- #Add Site Collection Admin to each OneDrive
- Foreach($Site in $OneDriveSites)
- {
-     Write-Host -f Yellow "Adding Site Collection Admin to: "$Site.URL
-     Set-SPOUser -Site $Site.Url -LoginName $Admin -IsSiteCollectionAdmin $True
-     $FolderURL = Join-Path -Path $site.Url -ChildPath "SMIME"
-     $userfolder = $site.owner.Split('@')[0]
-     $Downloadpath = "$destinationfolder\$userfolder"
-     get-DownloadSPFolder -SPFolderURL $FolderURL -DownloadPath $Downloadpath
-     Set-SPOUser -Site $Site.Url -LoginName $Admin -IsSiteCollectionAdmin $false
-     $site
- }
- Write-Host "Site Collection Admin Added to All OneDrive Sites Successfully!" -f Green
+    $Ctx.Load($SourceFolder)
 
+    $Ctx.ExecuteQuery()
+    $userfolder = $Site.Owner.Split('@')[0]
+    $Downloadpath = "$destinationfolder\$userfolder"
+    get-DownloadSPFolder -SiteURL $Site.Url -SourceFolder $SourceFolder -TargetFolder $Downloadpath
+    Set-SPOUser -Site $Site.Url -LoginName $Admin -IsSiteCollectionAdmin $false
+    $site
+}
+Write-Host "Site Collection Admin Added to All OneDrive Sites Successfully!" -f Green
