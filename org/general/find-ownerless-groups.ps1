@@ -1,14 +1,13 @@
  <#
   .SYNOPSIS
-  List groups wher user is Owner.
+  List groups without Owner.
 
   .DESCRIPTION
-  List groups wher user is Owner.
+  List groups without Owner.
 
   .NOTES
   Permissions
    MS Graph (API): 
-   - User.Read.All
    - Group.Read.All
 
   .INPUTS
