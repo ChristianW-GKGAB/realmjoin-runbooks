@@ -1,4 +1,4 @@
- <#
+<#
   .SYNOPSIS
   List groups without Owner.
 
@@ -13,6 +13,25 @@
   .INPUTS
   RunbookCustomization: {
         "Parameters": {
+            "ownerminimum": {
+                "Select": {
+                    "Options": [
+                        {
+                            "Display": "More than 1 Owner necessary",
+                            "Value": true
+                        },
+                        {
+                            "Display": "only 1 Owner necessary",
+                            "Value": false,
+                            "Customization": {
+                                "Hide": [
+                                    "minumumOwnerNumber"
+                                ]
+                            }
+                        }
+                    ]
+                }
+            },
             "CallerName": {
                 "Hide": true
             }
@@ -24,6 +43,10 @@
 #Requires -Modules @{ModuleName = "RealmJoin.RunbookHelper"; ModuleVersion = "0.6.0" }
 
 param(
+    [ValidateScript( { Use-RJInterface -DisplayName "Is More than 1 Owner necessary?" } )]
+    [bool] $ownerminimum,
+    [ValidateScript( { Use-RJInterface -DisplayName "Minimum Owner Number" } )]
+    [int] $minumumOwnerNumber,
     # CallerName is tracked purely for auditing purposes
     [Parameter(Mandatory = $true)]
     [string] $CallerName
@@ -32,14 +55,24 @@ param(
 
 Connect-RjRbGraph
 
-$Groups = Invoke-RjRbRestMethodGraph -Resource "/groups" -OdSelect "id,displayName"
+$Groups = Invoke-RjRbRestMethodGraph -Resource "/groups" -OdSelect "id,displayName,groupTypes" -OdFilter "groupTypes/any(c:c eq 'Unified')"
 $Ownerlessgroups = @()
-foreach($Group in $Groups){
-    $groupowners = Invoke-RjRbRestMethodGraph -Resource "/groups/$($Group.id)/owners"
-    if($null -eq $groupowners.Value){
-        $Ownerlessgroups += $Group
+if ($ownerminimum) {
+    foreach ($Group in $Groups) {
+        $groupowners = Invoke-RjRbRestMethodGraph -Resource "/groups/$($Group.id)/owners"
+        if ($groupowners.length -lt $minumumOwnerNumber) {
+            $Ownerlessgroups += $Group
+        }
     }
 }
-#&$expand=owners($select=id,userPrincipalName,displayName)
-"## list of groups without owners:"
+else {
+    foreach ($Group in $Groups) {
+        $groupowners = Invoke-RjRbRestMethodGraph -Resource "/groups/$($Group.id)/owners"
+        if ($null -eq $groupowners.Value) {
+            $Ownerlessgroups += $Group
+        }
+    }
+}
+
+"## list of groups without (enough) owners:"
 $Ownerlessgroups
