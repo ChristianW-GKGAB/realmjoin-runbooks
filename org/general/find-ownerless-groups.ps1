@@ -25,7 +25,7 @@
                             "Value": false,
                             "Customization": {
                                 "Hide": [
-                                    "minumumOwnerNumber"
+                                    "minimumOwnerNumber"
                                 ]
                             }
                         }
@@ -46,7 +46,7 @@ param(
     [ValidateScript( { Use-RJInterface -DisplayName "Is More than 1 Owner necessary?" } )]
     [bool] $ownerminimum,
     [ValidateScript( { Use-RJInterface -DisplayName "Minimum Owner Number" } )]
-    [int] $minumumOwnerNumber,
+    [int] $minimumOwnerNumber,
     # CallerName is tracked purely for auditing purposes
     [Parameter(Mandatory = $true)]
     [string] $CallerName
@@ -60,7 +60,7 @@ $Ownerlessgroups = @()
 if ($ownerminimum) {
     foreach ($Group in $Groups) {
         $groupowners = Invoke-RjRbRestMethodGraph -Resource "/groups/$($Group.id)/owners"
-        if ($groupowners.length -lt $minumumOwnerNumber) {
+        if ($groupowners.length -lt $minimumOwnerNumber) {
             $Ownerlessgroups += $Group
         }
     }
