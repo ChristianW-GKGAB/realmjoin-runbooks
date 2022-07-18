@@ -1,0 +1,51 @@
+function Invoke-IntuneRestoreDeviceManagementIntent {
+    <#
+    .SYNOPSIS
+    Restore Intune Device Management Intents
+    
+    .DESCRIPTION
+    Restore Intune Device Management Intents from JSON files per Device Management Intent from the specified Path.
+    
+    .PARAMETER Path
+    Root path where backup files are located, created with the Invoke-IntuneBackupDeviceManagementIntent function
+    
+    .EXAMPLE
+    Invoke-IntuneRestoreDeviceManagementIntent -Path "C:\temp" -RestoreById $true
+    #>
+    
+#Requires -Modules @{ModuleName = "RealmJoin.RunbookHelper"; ModuleVersion = "0.7.0" }, Microsoft.Graph.Intune
+
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path,
+    # CallerName is tracked purely for auditing purposes
+    [Parameter(Mandatory = $true)]
+    [string] $CallerName
+)
+
+Connect-RjRbGraph
+
+    # Get all device management intents
+    $deviceManagementIntents = Get-ChildItem -Path "$Path\Device Management Intents" -Recurse -File
+    foreach ($deviceManagementIntent in $deviceManagementIntents) {
+        $deviceManagementIntentContent = Get-Content -LiteralPath $deviceManagementIntent.FullName -Raw
+        $deviceManagementIntentDisplayName = ($deviceManagementIntentContent | ConvertFrom-Json).displayName
+        $templateId = $deviceManagementIntent.Name.Split("_")[0]
+        $templateDisplayName = ($deviceManagementIntent).DirectoryName.Split('\')[-1]
+
+        # Restore the device management intent
+        try {
+            $null = Invoke-RjRbRestMethodGraph -Resource "/deviceManagement/templates/$($templateId)/createInstance" -Body $deviceManagementIntentContent -method Post -Beta -ErrorAction Stop
+            [PSCustomObject]@{
+                "Action" = "Restore"
+                "Type"   = "Device Management Intent"
+                "Name"   = $deviceManagementIntentDisplayName
+                "Path"   = "Device Management Intents\$($deviceManagementIntent.Name)"
+            }
+        }
+        catch {
+            Write-Verbose "$deviceManagementIntentDisplayName - Failed to restore Device Management Intent ($templateDisplayName)" -Verbose
+            Write-Error $_ -ErrorAction Continue
+        }
+    }
+}
