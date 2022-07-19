@@ -1,5 +1,4 @@
-function Invoke-IntuneRestoreDeviceManagementScriptAssignment {
-    <#
+<#
     .SYNOPSIS
     Restore Intune Device Management Script Assignments
     
@@ -31,59 +30,57 @@ param(
 
 Connect-RjRbGraph
 
-    # Get all policies with assignments
-    $deviceManagementScripts = Get-ChildItem -Path "$Path\Device Management Scripts\Assignments"
-    foreach ($deviceManagementScript in $deviceManagementScripts) {
-        $deviceManagementScriptAssignments = Get-Content -LiteralPath $deviceManagementScript.FullName | ConvertFrom-Json
-        $deviceManagementScriptId = ($deviceManagementScriptAssignments[0]).id.Split(":")[0]
+# Get all policies with assignments
+$deviceManagementScripts = Get-ChildItem -Path "$Path\Device Management Scripts\Assignments"
+foreach ($deviceManagementScript in $deviceManagementScripts) {
+    $deviceManagementScriptAssignments = Get-Content -LiteralPath $deviceManagementScript.FullName | ConvertFrom-Json
+    $deviceManagementScriptId = ($deviceManagementScriptAssignments[0]).id.Split(":")[0]
 
-        # Create the base requestBody
-        $requestBody = @{
-            deviceManagementScriptAssignments = @()
-        }
+    # Create the base requestBody
+    $requestBody = @{
+        deviceManagementScriptAssignments = @()
+    }
         
-        # Add assignments to restore to the request body
-        foreach ($deviceManagementScriptAssignment in $deviceManagementScriptAssignments) {
-            $requestBody.deviceManagementScriptAssignments += @{
-                "target" = $deviceManagementScriptAssignment.target
-            }
+    # Add assignments to restore to the request body
+    foreach ($deviceManagementScriptAssignment in $deviceManagementScriptAssignments) {
+        $requestBody.deviceManagementScriptAssignments += @{
+            "target" = $deviceManagementScriptAssignment.target
         }
+    }
 
-        # Convert the PowerShell object to JSON
-        $requestBody = $requestBody | ConvertTo-Json -Depth 100
 
-        # Get the Device Management Script we are restoring the assignments for
-        try {
-            if ($restoreById) {
-                $deviceManagementScriptObject = Invoke-MSGraphRequest -HttpMethod GET -Url "deviceManagement/deviceManagementScripts/$deviceManagementScriptId"
-            }
-            else {
-                $deviceManagementScriptObject = Invoke-MSGraphRequest -HttpMethod GET -Url "deviceManagement/deviceManagementScripts" | Get-MSGraphAllPages | Where-Object displayName -eq "$($deviceManagementScript.BaseName)"
-                if (-not ($deviceManagementScriptObject)) {
-                    Write-Verbose "Error retrieving Intune Device Management Script for $($deviceManagementScript.FullName). Skipping assignment restore" -Verbose
-                    continue
-                }
-            }
-        }
-        catch {
-            Write-Verbose "Error retrieving Intune Device Management Script for $($deviceManagementScript.FullName). Skipping assignment restore" -Verbose
-            Write-Error $_ -ErrorAction Continue
-            continue
-        }
 
-        # Restore the assignments
-        try {
-            $null = Invoke-RjRbRestMethodGraph -Resource "/deviceManagement/deviceManagementScripts/$($deviceManagementScriptObject.id)/assign" -method Post -Body $requestBody -ErrorAction Stop
-            [PSCustomObject]@{
-                "Action" = "Restore"
-                "Type"   = "Device Management Script Assignments"
-                "Name"   = $deviceManagementScriptObject.displayName
-                "Path"   = "Device Management Scripts\Assignments\$($deviceManagementScript.Name)"
+    # Get the Device Management Script we are restoring the assignments for
+    try {
+        if ($restoreById) {
+            $deviceManagementScriptObject = Invoke-RjRbRestMethodGraph -Resource "/deviceManagement/deviceManagementScripts/$deviceManagementScriptId"
+        }
+        else {
+            $deviceManagementScriptObject = Invoke-RjRbRestMethodGraph "/deviceManagement/deviceManagementScripts" -FollowPaging | Where-Object displayName -eq "$($deviceManagementScript.BaseName)"
+            if (-not ($deviceManagementScriptObject)) {
+                Write-Verbose "Error retrieving Intune Device Management Script for $($deviceManagementScript.FullName). Skipping assignment restore" -Verbose
+                continue
             }
         }
-        catch {
-            Write-Verbose "$($deviceManagementScriptObject.displayName) - Failed to restore Device Management Script Assignment(s)" -Verbose
-            Write-Error $_ -ErrorAction Continue
+    }
+    catch {
+        Write-Verbose "Error retrieving Intune Device Management Script for $($deviceManagementScript.FullName). Skipping assignment restore" -Verbose
+        Write-Error $_ -ErrorAction Continue
+        continue
+    }
+
+    # Restore the assignments
+    try {
+        $null = Invoke-RjRbRestMethodGraph -Resource "/deviceManagement/deviceManagementScripts/$($deviceManagementScriptObject.id)/assign" -method Post -Body $requestBody -ErrorAction Stop
+        [PSCustomObject]@{
+            "Action" = "Restore"
+            "Type"   = "Device Management Script Assignments"
+            "Name"   = $deviceManagementScriptObject.displayName
+            "Path"   = "Device Management Scripts\Assignments\$($deviceManagementScript.Name)"
         }
+    }
+    catch {
+        Write-Verbose "$($deviceManagementScriptObject.displayName) - Failed to restore Device Management Script Assignment(s)" -Verbose
+        Write-Error $_ -ErrorAction Continue
     }
 }

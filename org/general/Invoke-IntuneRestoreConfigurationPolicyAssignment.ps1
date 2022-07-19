@@ -51,8 +51,6 @@ Connect-RjRbGraph
             }
         }
 
-        # Convert the PowerShell object to JSON
-        $requestBody = $requestBody | ConvertTo-Json -Depth 100
 
         # Get the Configuration Policy we are restoring the assignments for
         try {
@@ -60,7 +58,7 @@ Connect-RjRbGraph
                 $configurationPolicyObject = Invoke-RjRbRestMethodGraph -Resource "/deviceManagement/configurationPolicies/$configurationPolicyId"
             }
             else {
-                $configurationPolicyObject = Invoke-RjRbRestMethodGraph -Resource "/deviceManagement/configurationPolicies" -FollowPaging| Where-Object name -eq "$($configurationPolicy.BaseName)"
+                $configurationPolicyObject = Invoke-RjRbRestMethodGraph -Resource "/deviceManagement/configurationPolicies" -FollowPaging | Where-Object name -eq "$($configurationPolicy.BaseName)"
                 if (-not ($configurationPolicyObject)) {
                     Write-Verbose "Error retrieving Intune Session Catalog for $($configurationPolicy.FullName). Skipping assignment restore" -Verbose
                     continue

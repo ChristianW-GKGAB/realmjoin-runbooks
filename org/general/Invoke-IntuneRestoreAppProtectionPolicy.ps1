@@ -51,8 +51,21 @@ foreach ($appProtectionPolicy in $appProtectionPolicies) {
 
     # Restore the App Protection Policy
     try {
-        $null = Invoke-RjRbRestMethodGraph -Resource "/deviceAppManagement/managedAppPolicies" -Method Post -Body $requestBody  -ErrorAction Stop
-
+        if ($requestBody.psobject.properties.match('allowedAndroidDeviceManufacturers').IsInstance) {
+            $requestBody | Add-Member -Name "@odata.type" -Value "#microsoft.graph.androidManagedAppProtection" -MemberType "NoteProperty"
+            $null = Invoke-RjRbRestMethodGraph -Resource "/deviceAppManagement/androidManagedAppProtections" -Method Post -Body $requestBody  -ErrorAction Stop
+        }
+        elseif ($requestbody.psobject.properties.match('faceIdBlocked').IsInstance) {
+            $requestBody | Add-Member -Name "@odata.type" -Value "#microsoft.graph.iosManagedAppProtection" -MemberType "NoteProperty"
+            $null = Invoke-RjRbRestMethodGraph -Resource "/deviceAppManagement/iosManagedAppProtections" -Method Post -Body $requestBody  -ErrorAction Stop
+        }
+        elseif ($requestBody.psobject.properties.match('windowsHelloForBusinessBlocked').IsInstance) {
+            $requestBody | Add-Member -Name "@odata.type" -Value "#microsoft.graph.windowsInformationProtectionPolicy" -MemberType "NoteProperty"
+            $null = Invoke-RjRbRestMethodGraph -Resource "/deviceAppManagement/windowsInformationProtectionPolicies" -Method Post -Body $requestBody  -ErrorAction Stop
+        }
+        else {
+            $null = Invoke-RjRbRestMethodGraph -Resource "/deviceAppManagement/managedAppPolicies" -Method Post -Body $requestBody  -ErrorAction Stop
+        }
         [PSCustomObject]@{
             "Action" = "Restore"
             "Type"   = "App Protection Policy"

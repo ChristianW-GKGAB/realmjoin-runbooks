@@ -1,5 +1,4 @@
-function Invoke-IntuneRestoreGroupPolicyConfiguration {
-    <#
+<#
     .SYNOPSIS
     Restore Intune Group Policy Configurations
     
@@ -13,55 +12,54 @@ function Invoke-IntuneRestoreGroupPolicyConfiguration {
     Invoke-IntuneRestoreGroupPolicyConfiguration -Path "C:\temp" -RestoreById $true
     #>
     
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Path,
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path,
 
-        [Parameter(Mandatory = $false)]
-        [ValidateSet("v1.0", "Beta")]
-        [string]$ApiVersion = "Beta"
-    )
+    [Parameter(Mandatory = $false)]
+    [ValidateSet("v1.0", "Beta")]
+    [string]$ApiVersion = "Beta"
+)
 
-    # Set the Microsoft Graph API endpoint
-    if (-not ((Get-MSGraphEnvironment).SchemaVersion -eq $apiVersion)) {
-        Update-MSGraphEnvironment -SchemaVersion $apiVersion -Quiet
-        Connect-MSGraph -ForceNonInteractive -Quiet
-    }
+# Set the Microsoft Graph API endpoint
+if (-not ((Get-MSGraphEnvironment).SchemaVersion -eq $apiVersion)) {
+    Update-MSGraphEnvironment -SchemaVersion $apiVersion -Quiet
+    Connect-MSGraph -ForceNonInteractive -Quiet
+}
 
-    # Get all Group Policy Configurations
-    $groupPolicyConfigurations = Get-ChildItem -Path "$Path\Administrative Templates" -File
+# Get all Group Policy Configurations
+$groupPolicyConfigurations = Get-ChildItem -Path "$Path\Administrative Templates" -File
 
-    foreach ($groupPolicyConfiguration in $groupPolicyConfigurations) {
-        $groupPolicyConfigurationContent = Get-Content -LiteralPath $groupPolicyConfiguration.FullName -Raw | ConvertFrom-Json
+foreach ($groupPolicyConfiguration in $groupPolicyConfigurations) {
+    $groupPolicyConfigurationContent = Get-Content -LiteralPath $groupPolicyConfiguration.FullName -Raw | ConvertFrom-Json
         
-        # Restore the Group Policy Configuration
-        try {
-            $groupPolicyConfigurationRequestBody = @{
-                displayName = $groupPolicyConfiguration.BaseName
-            }
-            $groupPolicyConfigurationObject = Invoke-RjRbRestMethodGraph -Resource "/deviceManagement/groupPolicyConfigurations" -Body $groupPolicyConfigurationRequestBody -Method Post -ErrorAction Stop
+    # Restore the Group Policy Configuration
+    try {
+        $groupPolicyConfigurationRequestBody = @{
+            displayName = $groupPolicyConfiguration.BaseName
+        }
+        $groupPolicyConfigurationObject = Invoke-RjRbRestMethodGraph -Resource "/deviceManagement/groupPolicyConfigurations" -Body $groupPolicyConfigurationRequestBody -Method Post -ErrorAction Stop
+        [PSCustomObject]@{
+            "Action" = "Restore"
+            "Type"   = "Administrative Template"
+            "Name"   = $groupPolicyConfigurationObject.displayName
+            "Path"   = "Administrative Templates\$($groupPolicyConfiguration.Name)"
+        }
+
+        foreach ($groupPolicyConfigurationSetting in $groupPolicyConfigurationContent) {
+            $groupPolicyDefinitionValue = Invoke-RjRbRestMethodGraph -Resource "/deviceManagement/groupPolicyConfigurations/$($groupPolicyConfigurationObject.id)/definitionValues" -Body $groupPolicyConfigurationSetting -Method Post -ErrorAction Stop
+            $groupPolicyDefinition = Invoke-RjRbRestMethodGraph -Resource "/deviceManagement/groupPolicyConfigurations/$($groupPolicyConfigurationObject.id)/definitionValues/$($groupPolicyDefinitionValue.id)/definition"
             [PSCustomObject]@{
                 "Action" = "Restore"
-                "Type"   = "Administrative Template"
-                "Name"   = $groupPolicyConfigurationObject.displayName
+                "Type"   = "Administrative Template Setting"
+                "Name"   = $groupPolicyDefinition.displayName
                 "Path"   = "Administrative Templates\$($groupPolicyConfiguration.Name)"
             }
-
-            foreach ($groupPolicyConfigurationSetting in $groupPolicyConfigurationContent) {
-                $groupPolicyDefinitionValue = Invoke-RjRbRestMethodGraph -Resource "/deviceManagement/groupPolicyConfigurations/$($groupPolicyConfigurationObject.id)/definitionValues" -Body $groupPolicyConfigurationSetting -Method Post -ErrorAction Stop
-                $groupPolicyDefinition = Invoke-RjRbRestMethodGraph -Resource "/deviceManagement/groupPolicyConfigurations/$($groupPolicyConfigurationObject.id)/definitionValues/$($groupPolicyDefinitionValue.id)/definition"
-                [PSCustomObject]@{
-                    "Action" = "Restore"
-                    "Type"   = "Administrative Template Setting"
-                    "Name"   = $groupPolicyDefinition.displayName
-                    "Path"   = "Administrative Templates\$($groupPolicyConfiguration.Name)"
-                }
-            }
         }
-        catch {
-            Write-Verbose "$($groupPolicyConfiguration.BaseName) - Failed to restore Group Policy Configuration and/or (one or more) Settings" -Verbose
-            Write-Error $_ -ErrorAction Continue
-        }
+    }
+    catch {
+        Write-Verbose "$($groupPolicyConfiguration.BaseName) - Failed to restore Group Policy Configuration and/or (one or more) Settings" -Verbose
+        Write-Error $_ -ErrorAction Continue
     }
 }

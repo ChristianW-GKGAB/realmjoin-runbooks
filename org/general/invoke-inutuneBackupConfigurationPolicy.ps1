@@ -1,4 +1,3 @@
-
 <#
     .SYNOPSIS
     Backup Intune Settings Catalog Policies

@@ -1,4 +1,4 @@
-function Invoke-IntuneRestoreClientAppAssignment {
+
     <#
     .SYNOPSIS
     Restore Intune Client App Assignments (excluding managedAndroidStoreApp and managedIOSStoreApp)
@@ -17,25 +17,19 @@ function Invoke-IntuneRestoreClientAppAssignment {
     Invoke-IntuneRestoreClientAppAssignment -Path "C:\temp" -RestoreById $true
     #>
     
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Path,
+#Requires -Modules @{ModuleName = "RealmJoin.RunbookHelper"; ModuleVersion = "0.6.0" }
 
-        [Parameter(Mandatory = $false)]
-        [bool]$RestoreById = $true,
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path,
+    [Parameter(Mandatory = $false)]
+    [bool]$RestoreById = $true,
+    # CallerName is tracked purely for auditing purposes
+    [Parameter(Mandatory = $true)]
+    [string] $CallerName
+)
 
-        [Parameter(Mandatory = $false)]
-        [ValidateSet("v1.0", "Beta")]
-        [string]$ApiVersion = "Beta"
-    )
-
-    # Set the Microsoft Graph API endpoint
-    if (-not ((Get-MSGraphEnvironment).SchemaVersion -eq $apiVersion)) {
-        Update-MSGraphEnvironment -SchemaVersion $apiVersion -Quiet
-        Connect-MSGraph -ForceNonInteractive -Quiet
-    }
-
+Connect-RjRbGraph
     # Get all policies with assignments
     $clientApps = Get-ChildItem -Path "$Path\Client Apps\Assignments"
     foreach ($clientApp in $clientApps) {
@@ -66,8 +60,7 @@ function Invoke-IntuneRestoreClientAppAssignment {
             }
         }
 
-        # Convert the PowerShell object to JSON
-        $requestBody = $requestBody | ConvertTo-Json -Depth 100
+        
 
         # Get the Client App we are restoring the assignments for
         try {
@@ -90,7 +83,7 @@ function Invoke-IntuneRestoreClientAppAssignment {
 
         # Restore the assignments
         try {
-            $null = Invoke-MSGraphRequest -HttpMethod POST -Content $requestBody.toString() -Url "deviceAppManagement/mobileApps/$($clientAppObject.id)/assign" -ErrorAction Stop
+            $null = Invoke-RjRbRestMethodGraph -resource "/deviceAppManagement/mobileApps/$($clientAppObject.id)/assign" -Method Post -body $requestBody -ErrorAction Stop
             [PSCustomObject]@{
                 "Action" = "Restore"
                 "Type"   = "Client App Assignments"
@@ -108,4 +101,3 @@ function Invoke-IntuneRestoreClientAppAssignment {
             }
         }
     }
-}

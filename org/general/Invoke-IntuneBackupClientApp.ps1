@@ -1,5 +1,4 @@
-
-    <#
+<#
     .SYNOPSIS
     Backup Intune Client Apps
     
@@ -26,26 +25,25 @@ param(
 Connect-RjRbGraph
 
 
-    # Create folder if not exists
-    if (-not (Test-Path "$Path\Client Apps")) {
-        $null = New-Item -Path "$Path\Client Apps" -ItemType Directory
+# Create folder if not exists
+if (-not (Test-Path "$Path\Client Apps")) {
+    $null = New-Item -Path "$Path\Client Apps" -ItemType Directory
+}
+
+# Get all Client Apps
+$clientApps = Invoke-RjRbRestMethodGraph -Resource "/deviceAppManagement/mobileApps" -Odfilter "microsoft.graph.managedApp/appAvailability eq null or microsoft.graph.managedApp/appAvailability eq 'lineOfBusiness' or isAssigned eq true" -Beta -FollowPaging
+
+foreach ($clientApp in $clientApps) {
+    $clientAppType = $clientApp.'@odata.type'.split('.')[-1]
+
+    $fileName = ($clientApp.displayName).Split([IO.Path]::GetInvalidFileNameChars()) -join '_'
+    $clientAppDetails = Invoke-RjRbRestMethodGraph -Resource "/deviceAppManagement/mobileApps/$($clientApp.id)"
+    $clientAppDetails | ConvertTo-Json | Out-File -LiteralPath "$path\Client Apps\$($clientAppType)_$($fileName).json"
+
+    [PSCustomObject]@{
+        "Action" = "Backup"
+        "Type"   = "Client App"
+        "Name"   = $clientApp.displayName
+        "Path"   = "Client Apps\$($clientAppType)_$($fileName).json"
     }
-
-    # Get all Client Apps
-    $clientApps = Invoke-RjRbRestMethodGraph -Resource "/deviceAppManagement/mobileApps" -Odfilter "(microsoft.graph.managedApp/appAvailability+eq+null+or+microsoft.graph.managedApp/appAvailability+eq+'lineOfBusiness'+or+isAssigned+eq+true)" -Beta -FollowPaging
-
-    foreach ($clientApp in $clientApps) {
-        $clientAppType = $clientApp.'@odata.type'.split('.')[-1]
-
-        $fileName = ($clientApp.displayName).Split([IO.Path]::GetInvalidFileNameChars()) -join '_'
-        $clientAppDetails = Invoke-RjRbRestMethodGraph -Resource "/deviceAppManagement/mobileApps/$($clientApp.id)"
-        $clientAppDetails | ConvertTo-Json | Out-File -LiteralPath "$path\Client Apps\$($clientAppType)_$($fileName).json"
-
-        [PSCustomObject]@{
-            "Action" = "Backup"
-            "Type"   = "Client App"
-            "Name"   = $clientApp.displayName
-            "Path"   = "Client Apps\$($clientAppType)_$($fileName).json"
-        }
-    }
-
+}
