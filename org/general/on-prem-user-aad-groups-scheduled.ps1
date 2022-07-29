@@ -2,27 +2,29 @@
 .SYNOPSIS
 add on prem Users to a AAD Groups.
 remove on prem Users from AAD Groups.
+remove on prem Users from AD Groups
+
 #>
 
 
 [string] $MigGroupName = ""
-[string] $AAdGroupIDs = ""
-[string] $RemoveAADGroupIDs = ""
+$AAdGroupIDs = @()
+$RemoveAADGroupIDs = @()
+$RemoveActiveDirectoryGroups = @()
 [string] $logsFolder = ""
 
 Connect-MgGraph -Scopes "User.Read.All", "Group.ReadWrite.All"
 
 $beforedate = (Get-Date).AddDays(-1)
-$AADGroupIDArray = $AAdGroupIDs.Split(',')
-$RemoveAADGroupIDArray = $RemoveAADGroupIDs.Split(',')
+
 $AllUsers = Get-ADUser -Properties whencreated -Filter *
 
 $AADGroups = @()
-foreach ($AADGroupID in $AADGroupIDArray) {
+foreach ($AADGroupID in $AAdGroupIDs) {
     $AADGroups += Get-MgGroup -GroupId $AADGroupID
 }
 $removeAADGroups = @()
-foreach ($RemoveAADGroupID in $RemoveAADGroupIDArray) {
+foreach ($RemoveAADGroupID in $RemoveAADGroupIDs) {
     $removeAADGroups += Get-MgGroup -GroupId $RemoveAADGroupID
 }
 
@@ -60,6 +62,16 @@ foreach ($RemoveAADGroup in $RemoveAADGroups) {
         if ($RemoveAADGroupMembers.contains($AADUser.id)) {
             Remove-MgGroupMemberByRef -GroupId $RemoveAADGroup.id -DirectoryObjectId $AADUser.id
             $logs += "## removed $($AADUser.UserPrincipalName) from $($RemoveAADGroup.DisplayName)"
+        }
+    }
+}
+foreach ($RemoveActiveDirectoryGroup in $RemoveActiveDirectoryGroups) {
+    $RemoveActiveDirectoryGroupMembers = @()
+    $RemoveActiveDirectoryGroupMembers = Get-ADGroupMember -Identity $RemoveActiveDirectoryGroup | Select-Object -ExpandProperty SamAccountName
+    foreach ($AADUser in $AADUsers) {
+        if($RemoveActiveDirectoryGroupMembers.contains($AADUser.onPremisesSamAccountName)){
+        Remove-ADGroupMember -Identity $RemoveActiveDirectoryGroup -Members $AADUser.onPremisesSamAccountName -Confirm:$false
+        $logs += "## removed $($AADUser.UserPrincipalName) from $RemoveActiveDirectoryGroup"
         }
     }
 }
