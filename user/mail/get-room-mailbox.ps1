@@ -12,12 +12,14 @@
 
   .INPUTS
   RunbookCustomization: {
-        "Parameters": {
-            "CallerName": {
+    "Parameters": {
+            "UserName": {
+                "Hide": true
+            },
+            "Remove": {
                 "Hide": true
             }
         }
-    }
 
 #>
 
@@ -26,7 +28,7 @@
 param (
     [Parameter(Mandatory = $true)] 
     [ValidateScript( { Use-RJInterface -Type Graph -Entity User -DisplayName "User/Mailbox"} )]
-    [string] $MailboxName,
+    [string] $UserName,
     # CallerName is tracked purely for auditing purposes
     [Parameter(Mandatory = $true)]
     [string] $CallerName
@@ -34,7 +36,5 @@ param (
 
 Connect-RjRbGraph
 
-$User = Invoke-RjRbRestMethodGraph -Resource "/users/$($MailboxName)"
-
+$User = Invoke-RjRbRestMethodGraph -Resource "/users/$($UserName)" 
 Invoke-RjRbRestMethodGraph -Resource "/places/$($User.userPrincipalName)/microsoft.graph.room" 
-
