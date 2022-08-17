@@ -8,9 +8,7 @@ first group in array supercedes the others
 
 Connect-MgGraph -Scopes "User.Read.All", "Group.ReadWrite.All"
 
-$groupArray = @("7082a9d8-e27f-4ece-840d-32592f5b5967",
-"0d3f2427-e496-45b5-9cd6-cca5adc4b5f5"
-)
+$groupArray = @()
 $groupcounter = 0
 $firstgroupMembers = @()
 foreach($group in $GroupArray){
