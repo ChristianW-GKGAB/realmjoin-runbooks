@@ -41,7 +41,7 @@ Connect-RjRbGraph
 $deviceIntune = Invoke-RjRbRestMethodGraph -Resource "/deviceManagement/managedDevices" -OdFilter "serialNumber eq '$($SerialNumber)'"
 $autopilotdevice = Invoke-RjRbRestMethodGraph -Resource "/deviceManagement/windowsAutopilotDeviceIdentities" -OdFilter "serialNumber eq '$($SerialNumber)'"
 
-$deviceAAD = Invoke-RjRbRestMethodGraph -Resource "/devices"
+#$deviceAAD = Invoke-RjRbRestMethodGraph -Resource "/devices"
 
 
 
