@@ -61,4 +61,9 @@ if($deviceIntune){
 else{
     "## intune false"
 }
+if(($null -eq $deviceIntune) -and $autopilotdevice){
+    "## Devicename $($autopilotdevice.deviceName)"
+    "## Model $($autopilotdevice.model)"
+    "## Manufacturer $($autopilotdevice.manufacturer)"
+}
 
