@@ -1,9 +1,9 @@
 <#
   .SYNOPSIS
-  Disable a device in AzureAD.
+  Check if a device is deleted.
 
   .DESCRIPTION
-  Disable a device in AzureAD.
+  Check if a device is deleted.
 
   .NOTES
   Permissions (Graph):
