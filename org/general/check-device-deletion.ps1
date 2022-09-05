@@ -8,8 +8,6 @@
   .NOTES
   Permissions (Graph):
   - Device.Read.All
-  Roles (AzureAD):
-  - Cloud Device Administrator
 
   .INPUTS
   RunbookCustomization: {
