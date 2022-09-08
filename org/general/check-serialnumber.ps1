@@ -36,7 +36,7 @@ $SerialNumberobject = $SerialNumbers.Split(',')
 $presentSerials = @()
 $missingSerials = @()
 foreach($SerialNumber in $SerialNumberobject){
-
+$SerialNumber = $SerialNumber.TrimStart()
 $autopilotdevice = Invoke-RjRbRestMethodGraph -Resource "/deviceManagement/windowsAutopilotDeviceIdentities" -OdFilter "contains(serialNumber,'$($SerialNumber)')" -ErrorAction SilentlyContinue 
 if($autopilotdevice){
     $presentSerials += $autopilotdevice
